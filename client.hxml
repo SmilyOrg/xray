@@ -1,0 +1,6 @@
+-main xray.Client
+-cp ../dox/src
+-cp src
+-cp /ws/hxparse/src
+-js bin/index.js
+-dce no

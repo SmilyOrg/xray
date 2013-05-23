@@ -1,0 +1,20 @@
+.i { color: #F8F8F2; } /* identifier */
+.t { color: #66D9EF; } /* type #A6E22A */
+.k { color: #F92772; } /* keyword */
+.d { color: #66D9EF; } /* directive */
+.c { color: #AE81FF; } /* constant */
+.s { color: #E6DB74; } /* string */
+.comment { color:#75715E; }
+
+.inactive { color: #75715E; }
+.macro { color: #A6E22A; }
+
+body { background: #272822; }
+code { color: #F8F8F2; tab-size:4;}
+
+::selection {
+	background: #999999;
+}
+
+li { list-style:none; }
+li a { color:white; }

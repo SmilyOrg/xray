@@ -1,6 +1,7 @@
 package xray;
 
 import haxe.macro.Context;
+import haxe.macro.Compiler;
 import haxe.macro.Type;
 import haxe.macro.Expr;
 import sys.FileSystem;
@@ -17,7 +18,7 @@ class Macro
 	public static function build()
 	{
 		Sys.println(platform);
-
+		
 		var classPaths = Context.getClassPath();
 		classPaths = classPaths.filter(FileSystem.exists);
 		classPaths = classPaths.map(normalizePath);
@@ -78,16 +79,8 @@ class Macro
 
 	static function generate(types:Array<Type>)
 	{
-		for (type in types)
-		{
-			var base = type.baseType();
-			if (base == null) continue;
-
-			var pos = Context.getPosInfos(base.pos);
-			if (pos.file != "/usr/lib/haxe/std/haxe/Http.hx") continue;
-
-			processType(type);
-		}
+		var inspector = new Inspector();
+		inspector.process(types);
 
 		return;
 

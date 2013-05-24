@@ -92,6 +92,37 @@ class Source
 		}
 	}
 
+	public function parseTypeId():Bool
+	{
+		var tokens = [];
+		var index = 0;
+		var token = stream.peek();
+
+		while (token.tok != Eof)
+		{
+			tokens.push(token);
+
+			switch (token.tok)
+			{
+				case Const(CIdent(s)):
+					var code = s.charCodeAt(0);
+					if (code > 64 && code < 91)
+					{
+						for (token in tokens) add(token, "t");
+						return true;
+					}
+				case Dot:
+				case _:
+					return false;
+			}
+
+			index += 1;
+			token = stream.peek(index);
+		}
+
+		return false;
+	}
+
 	public function skipTokens()
 	{
 		var token = stream.peek();
@@ -179,9 +210,10 @@ class Source
 				case Kwd(_), Const(CIdent("trace")):
 					add(token, "k"); 
 				case Const(CIdent(s)):
-					var code = s.charCodeAt(0);
-					if (code > 64 && code < 91) add(token, "t"); 
-					else add(token, "i"); 
+					if (!parseTypeId()) add(token, "i"); 
+					// var code = s.charCodeAt(0);
+					// if (code > 64 && code < 91) add(token, "t"); 
+					// else add(token, "i"); 
 				case Const(CString(_)):
 					add(token, "s"); 
 				case Const(_):

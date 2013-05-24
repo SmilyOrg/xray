@@ -78,6 +78,19 @@ class Macro
 
 	static function generate(types:Array<Type>)
 	{
+		for (type in types)
+		{
+			var base = type.baseType();
+			if (base == null) continue;
+
+			var pos = Context.getPosInfos(base.pos);
+			if (pos.file != "/usr/lib/haxe/std/haxe/Http.hx") continue;
+
+			processType(type);
+		}
+
+		return;
+
 		types = types.map(typeModel);
 
 		var models = new Map<String, Dynamic>();

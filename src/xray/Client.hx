@@ -3,9 +3,8 @@ package xray;
 import haxe.macro.Type;
 
 import js.html.InputElement;
-import xray.Data;
 using xray.Tools;
-using dox.TypeTools;
+using xray.TypeTools;
 using Lambda;
 
 @:expose('client') class Client

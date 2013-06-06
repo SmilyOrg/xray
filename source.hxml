@@ -1,0 +1,4 @@
+-neko api
+-cp src
+--no-output
+--macro xray.Source.build()

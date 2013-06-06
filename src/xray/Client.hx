@@ -6,6 +6,7 @@ import js.html.InputElement;
 using xray.TypeTools;
 using xray.Data;
 using Lambda;
+using StringTools;
 
 @:expose('client') class Client
 {
@@ -13,96 +14,112 @@ using Lambda;
 	{
 		FieldKind;
 		RefData;
+		new Client();
+	}
 
-		var http = new haxe.Http("neko.txt");
-		http.onData = parseData;
+	var model:Model;
+	var sources:Array<SourceFile>;
+	var files:Map<String, String>;
+	var output:js.html.DivElement;
+	var export:Map<String, Array<String>>;
+
+	function new()
+	{
+		files = new Map();
+
+		var window = js.Browser.window;
+		window.addEventListener("hashchange", updateLocation);
+
+		output = cast js.Browser.document.getElementById("results");
+		loadSources();
+	}
+
+	function loadSources()
+	{
+		var http = new haxe.Http("source.txt");
+		http.onData = parseSources;
 		http.request();
 	}
 
-	static var model:Model;
-	// static var printer:dox.Printer;
-
-	static function parseData(data:String)
+	function parseSources(data:String)
 	{
-		var unserializer = new Unserializer(data);
-		model = unserializer.getModel();
+		// var unserializer = new Unserializer(data);
+		// model = unserializer.getModel();
 
-		// codeModel = new dox.Model(model.types.array());
-		// printer = new dox.Printer(codeModel);
-
-		var search:InputElement = cast js.Browser.document.getElementById("search");
-		search.onkeyup = function(_) {
-			filter(search.value);
-		}
+		sources = haxe.Unserializer.run(data);
+		loadExport();
 	}
 
-	static function filter(query:String)
+	function loadExport()
 	{
-		var search:InputElement = cast js.Browser.document.getElementById("search");
-		if (search.value != query) search.value = query;
+		var http = new haxe.Http("export.txt");
+		http.onData = parseExport;
+		http.request();
+	}
 
-		query = query.toLowerCase();
-		var results = [];
+	function parseExport(data)
+	{
+		export = haxe.Unserializer.run(data);
+		updateLocation(null);
+	}
 
-		for (key in model.type.keys())
+	function updateLocation(_)
+	{
+		var window = js.Browser.window;
+		var path = window.location.pathname;
+		var hash = window.location.hash;
+		var file = hash.substr(1);
+		showPath(file);
+	}
+
+	function showPath(url:String)
+	{
+		var matches = [];
+
+		for (source in sources)
 		{
-			var id = key.toLowerCase();
-			var name = id.split(".").pop();
-			var type = model.type.get(key);
-
-			if (query == name)
+			if (StringTools.startsWith(source.local, url))
 			{
-				results = [type];
-				break;
-			}
-
-			if (id.indexOf(query) > -1)
-			{
-				results.push(type);
+				matches.push(source);
 			}
 		}
 
-		// results.sort(function(a,b){
-		// 	return Reflect.compare(a.module,b.module);
-		// });
-
-		if (results.length > 1)
+		if (matches.length == 0) return;
+		
+		if (matches.length == 1)
 		{
-			var chunks = [];
-			currentId = null;
-
-			for (result in results)
-			{
-				var base = result.toBaseType();
-				if (base != null)
-				{
-					var name = base.pack.concat([base.name]).join(".");
-					chunks.push('<li><a href="javascript:client.filter(\'$name\');">$name</a></li>');
-				}
-			}
-
-			var output = js.Browser.document.getElementById("results");
-			output.innerHTML = chunks.join("\n");
+			showSource(matches[0].local);
 		}
 		else
 		{
-			var result = results[0];
-			var pos = result.toBaseType().pos;
-			var id = pos.file;
-
-			if (id != currentId)
-			{
-				currentId = id;
-
-				var source = model.file.get(id);
-				var output = js.Browser.document.getElementById("results");
-				output.innerHTML = '<pre><code>'+xhx.HaxeMarkup.markup(source, id)+'</code></pre>';
-			}
-			
-			// printer.printType(results[0]);
-			// chunks.push(printer.getString());
+			var items = matches.map(function(source){
+				return '<a href="#${source.local}">${source.local}</a>';
+			});
+			output.innerHTML = '<pre>' + items.join('\n') + '</pre>';
 		}
 	}
 
-	static var currentId:String;
+	function showSource(url:String)
+	{
+		if (!files.exists(url))
+		{
+			loadSource(url);
+			return;
+		}
+
+		output.innerHTML = xhx.HaxeMarkup.markup(files.get(url), url, export);
+	}
+
+	function loadSource(url:String)
+	{
+		var http = new haxe.Http("src" + url);
+		http.onData = sourceLoaded.bind(_, url);
+		http.request();
+	}
+
+	function sourceLoaded(data:String, url:String)
+	{
+		files.set(url, data);
+		showSource(url);
+	}
 }

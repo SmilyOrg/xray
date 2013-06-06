@@ -1,7 +1,3 @@
--cmd mkdir -p bin
-
---next
-
 -cp src
 --no-output
 -dce no

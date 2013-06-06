@@ -1,7 +1,11 @@
 body { background: #272822; }
+pre a { text-decoration: none; color:#F8F8F2; }
+pre a:visited { color:#F8F8F2; }
+pre a:hover { color:#F8F8F2; text-decoration:underline; }
 
-code li { list-style:decimal-leading-zero; }
-code { color: #F8F8F2; tab-size:4;}
+pre { font-family:'Source Code Pro','Courier New',monospace; font-size:13px; tab-size:4;}
+
+code { color: #F8F8F2; }
 code .identifier { color:#F8F8F2; }
 code .type { color:#FF9901; }
 code .keyword { color:#F92772; }

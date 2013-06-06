@@ -4,6 +4,11 @@ using haxe.macro.Tools;
 import haxe.macro.Expr;
 using Lambda;
 
+typedef SourceFile = {
+	path:String,
+	local:String
+}
+
 class RefData<T>
 {
 	public static function of<T>(ref:T):RefData<T>

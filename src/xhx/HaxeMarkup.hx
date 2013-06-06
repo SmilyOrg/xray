@@ -3,6 +3,8 @@ package xhx;
 import xhx.Data;
 import xhx.HaxeLexer;
 import hxparse.LexerStream;
+import haxe.macro.Expr;
+using Lambda;
 
 class HaxeMarkup
 {
@@ -15,14 +17,29 @@ class HaxeMarkup
 	public inline static var MACRO = "macro";
 	public inline static var TYPE = "type";
 
-	public static function markup(source:String, file:String)
+	public static function markup(source:String, file:String, exports:Map<String, Array<String>>)
 	{
 		if (source == "" || source == null) return "";
-		var parser = new HaxeMarkup(source, file);
+		var parser = new HaxeMarkup(source, file, exports);
 		source = parser.parse();
 		return '<code><pre>$source</pre></core>';
 	}
 
+	static function punion(p1:Position, p2:Position)
+	{
+		return {
+			file: p1.file,
+			min: p1.min < p2.min ? p1.min : p2.min,
+			max: p1.max > p2.max ? p1.max : p2.max,
+		};
+	}
+
+	function src(p:Position)
+	{
+		return source.substring(p.min, p.max);
+	}
+
+	var imports:Array<String>;
 	var active:Bool;
 	var defines:Map<String, Bool>;
 	var source:String;
@@ -31,9 +48,15 @@ class HaxeMarkup
 	var stream:LexerStream<Token>;
 	var stack:Array<Bool>;
 	var pad:Int;
+	var exports:Map<String, Array<String>>;
+	
+	var module:String;
+	var pack:String;
+	var name:String;
 
-	public function new(source:String, file:String)
+	public function new(source:String, file:String, exports:Map<String, Array<String>>)
 	{
+		this.exports = exports;
 		this.active = true;
 		this.defines = new Map<String, Bool>();
 		this.source = source;
@@ -44,9 +67,15 @@ class HaxeMarkup
 		var input = new haxe.io.StringInput(source);
 		stream = new LexerStream(new HaxeLexer(input, file), HaxeLexer.tok);
 
+		imports = ["StdTypes"];
 		pad = Std.string(source.split("\n").length).length;
 		defines.set("neko", true);
 		defines.set("sys", true);
+
+		var parts = file.substr(1, file.length - 4).split("/");
+		module = parts.join(".");
+		name = parts.pop();
+		pack = parts.join(".");
 	}
 
 	public function add(token:Token, ?span:String)
@@ -61,22 +90,47 @@ class HaxeMarkup
 		// add token string
 		max = token.pos.max;
 		var str = StringTools.htmlEscape(source.substring(token.pos.min, max));
-		if (span == null) buf.add(str);
-		else buf.add('<span class="$span">$str</span>');
+		if (span == null)
+		{
+			buf.add(str);
+		}
+		else
+		{
+			if (span == TYPE)
+			{
+				var module = resolveType(str);
+				if (module != null)
+				{
+					var href = "#/" + module.split(".").join("/") + ".hx";
+					buf.add('<a href="$href"><span class="$span">$str</span></a>');
+				}
+				else
+				{
+					buf.add('<span class="$span">$str</span>');
+				}
+			}
+			else
+			{
+				buf.add('<span class="$span">$str</span>');
+			}
+		}
 
 		stream.junk();
 	}
 
+	function isDefined(flag:String)
+	{
+		return defines.exists(flag);
+	}
+
 	function parseMacro():Bool
 	{
-		return true;
-		
 		var token = stream.peek();
 		return switch (token.tok)
 		{
 			case Const(CIdent(s)):
 				add(token, MACRO);
-				defines.exists(s);
+				isDefined(s);
 			case Kwd(Macro):
 				add(token, MACRO);
 				defines.exists(MACRO);
@@ -110,7 +164,7 @@ class HaxeMarkup
 		}
 	}
 
-	public function parseTypeId():Bool
+	public function parseTypeId():String
 	{
 		var tokens = [];
 		var index = 0;
@@ -126,19 +180,22 @@ class HaxeMarkup
 					var code = s.charCodeAt(0);
 					if (code > 64 && code < 91)
 					{
-						for (token in tokens) add(token, TYPE);
-						return true;
+						var token = {pos:punion(tokens[0].pos, tokens[tokens.length - 1].pos), tok:null};
+						add(token, TYPE);
+						tokens.pop();
+						for (token in tokens) stream.junk();
+						return src(token.pos);
 					}
 				case Dot:
 				case _:
-					return false;
+					return null;
 			}
 
 			index += 1;
 			token = stream.peek(index);
 		}
 
-		return false;
+		return null;
 	}
 
 	public function skipTokens()
@@ -223,12 +280,16 @@ class HaxeMarkup
 					{
 						stack.shift();
 					}
-				case Kwd(Class), Kwd(Import), Kwd(Enum), Kwd(Abstract), Kwd(Typedef), Kwd(Package):
+				case Kwd(Import):
+					add(token, DIRECTIVE);
+					imports.push(parseTypeId());
+
+				case Kwd(Class), Kwd(Enum), Kwd(Abstract), Kwd(Typedef), Kwd(Package):
 					add(token, DIRECTIVE);
 				case Kwd(_), Const(CIdent("trace")):
 					add(token, KEYWORD); 
 				case Const(CIdent(s)):
-					if (!parseTypeId()) add(token, IDENTIFIER); 
+					if (parseTypeId() == null) add(token, IDENTIFIER); 
 				case Const(CString(_)):
 					add(token, STRING); 
 				case Const(_):
@@ -250,9 +311,60 @@ class HaxeMarkup
 		{
 			var num = StringTools.lpad(Std.string(l++), " ", pad);
 			num = '<span class="num">$num</span>';
-			buf.add(num + "  " + line + "\n");
+			buf.add(num + " " + line + "\n");
 		}
 		
 		return buf.toString();
+	}
+
+	function resolveType(type:String)
+	{
+		if (type == name) return module;
+
+		// current module
+		if (exports.exists(module))
+		{
+			var exported = exports.get(module);
+			if (exported.has(type))
+			{
+				trace('Found $type in this module');
+				return module;
+			}
+		}
+
+		// imports
+		for (i in imports)
+		{
+			if (!exports.exists(i))
+			{
+				trace('No export for import $i');
+				return null;
+			}
+
+			var exported = exports.get(i);
+			if (exported.has(type))
+			{
+				trace('Found $type in $i');
+				return i;
+			}
+		}
+
+		// top level or fully qualified
+		if (exports.exists(type))
+		{
+			trace('Found $type in top level');
+			return type;
+		}
+
+		// package
+		var name = pack + "." + type;
+		if (exports.exists(name))
+		{
+			trace('Found $type in current package');
+			return name;
+		}
+
+		trace('couldn\'t find $type');
+		return null;
 	}
 }

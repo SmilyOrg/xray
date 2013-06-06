@@ -1,9 +1,16 @@
--neko api
+-cmd mkdir -p bin
+
+--next
+
 -cp src
 --no-output
 -dce no
 -D use_rtti_doc
 --macro xray.Macro.build()
+
+--each
+
+-neko api
 
 # --next
 

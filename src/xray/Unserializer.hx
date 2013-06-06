@@ -13,17 +13,18 @@ class Unserializer extends haxe.Unserializer
 		paths = [];
 	}
 
-	public function getTypes():Array<Type>
+	public function getModel():Model
 	{
-		var model = unserialize();
-		var cache:Map<String, Dynamic> = model.cache;
+		var model:Model = unserialize();
+
+		var cache:Map<String, Dynamic> = model.baseType;
 
 		for (path in paths)
 		{
 			Reflect.setField(path.o, path.k, cache.get(path.v._key));
 		}
 
-		return model.types;
+		return model;
 	}
 
 	override function unserializeObject(o)

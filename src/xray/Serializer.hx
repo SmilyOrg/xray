@@ -29,7 +29,6 @@ class Serializer extends haxe.Serializer
 		for (f in Reflect.fields(v))
 		{
 			if (ignores.exists(f)) continue;
-			
 			var val:Dynamic = Reflect.field(v,f);
 			serializeString(f);
 			serialize(val);

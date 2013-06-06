@@ -3,8 +3,8 @@ package xray;
 import haxe.macro.Type;
 
 import js.html.InputElement;
-using xray.Tools;
 using xray.TypeTools;
+using xray.Data;
 using Lambda;
 
 @:expose('client') class Client
@@ -12,6 +12,7 @@ using Lambda;
 	public static function main()
 	{
 		FieldKind;
+		RefData;
 
 		var http = new haxe.Http("neko.txt");
 		http.onData = parseData;
@@ -19,14 +20,15 @@ using Lambda;
 	}
 
 	static var model:Model;
-	static var codeModel:dox.Model;
-	static var printer:dox.Printer;
+	// static var printer:dox.Printer;
 
 	static function parseData(data:String)
 	{
-		model = haxe.Unserializer.run(data);
-		codeModel = new dox.Model(model.types.array());
-		printer = new dox.Printer(codeModel);
+		var unserializer = new Unserializer(data);
+		model = unserializer.getModel();
+
+		// codeModel = new dox.Model(model.types.array());
+		// printer = new dox.Printer(codeModel);
 
 		var search:InputElement = cast js.Browser.document.getElementById("search");
 		search.onkeyup = function(_) {
@@ -42,11 +44,11 @@ using Lambda;
 		query = query.toLowerCase();
 		var results = [];
 
-		for (key in model.types.keys())
+		for (key in model.type.keys())
 		{
 			var id = key.toLowerCase();
 			var name = id.split(".").pop();
-			var type = model.types.get(key);
+			var type = model.type.get(key);
 
 			if (query == name)
 			{
@@ -67,11 +69,11 @@ using Lambda;
 		if (results.length > 1)
 		{
 			var chunks = [];
-			currentId = -1;
+			currentId = null;
 
 			for (result in results)
 			{
-				var base = result.baseType();
+				var base = result.toBaseType();
 				if (base != null)
 				{
 					var name = base.pack.concat([base.name]).join(".");
@@ -86,18 +88,15 @@ using Lambda;
 		{
 			var result = results[0];
 			var pos = result.toBaseType().pos;
-			var id:Int = cast pos.file;
+			var id = pos.file;
 
 			if (id != currentId)
 			{
 				currentId = id;
 
-				var file = model.files.get(id);
-				var path = file.path;
-				var source = file.source;
-				
+				var source = model.file.get(id);
 				var output = js.Browser.document.getElementById("results");
-				output.innerHTML = '<pre><code>'+Source.markup(source, path)+'</code></pre>';
+				output.innerHTML = '<pre><code>'+xhx.HaxeMarkup.markup(source, id)+'</code></pre>';
 			}
 			
 			// printer.printType(results[0]);
@@ -105,11 +104,5 @@ using Lambda;
 		}
 	}
 
-	static var currentId:Int;
-}
-
-typedef Model =
-{
-	var types:Map<String, Type>;
-	var files:Map<Int, {path:String, source:String}>;
+	static var currentId:String;
 }

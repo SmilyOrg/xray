@@ -1,16 +1,17 @@
-.i { color: #F8F8F2; } /* identifier */
-.t { color: #FF9901; } /* type #A6E22A */
-.k { color: #F92772; } /* keyword */
-.d { color: #66D9EF; } /* directive */
-.c { color: #AE81FF; } /* constant */
-.s { color: #E6DB74; } /* string */
-.comment { color:#75715E; }
-
-.inactive { color: #75715E; }
-.macro { color: #A6E22A; }
-
 body { background: #272822; }
+
+code li { list-style:decimal-leading-zero; }
 code { color: #F8F8F2; tab-size:4;}
+code .identifier { color:#F8F8F2; }
+code .type { color:#FF9901; }
+code .keyword { color:#F92772; }
+code .directive { color:#66D9EF; }
+code .constant { color:#AE81FF; }
+code .comment { color:#75715E; }
+code .string { color:#E6DB74; }
+code .macro { color:#A6E22A; }
+code .inactive { color:#75715E; }
+code .num { color:#777777; }
 
 ::selection {
 	background: #999999;

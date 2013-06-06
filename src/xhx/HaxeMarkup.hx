@@ -30,6 +30,7 @@ class HaxeMarkup
 	var buf:StringBuf;
 	var stream:LexerStream<Token>;
 	var stack:Array<Bool>;
+	var pad:Int;
 
 	public function new(source:String, file:String)
 	{
@@ -43,6 +44,7 @@ class HaxeMarkup
 		var input = new haxe.io.StringInput(source);
 		stream = new LexerStream(new HaxeLexer(input, file), HaxeLexer.tok);
 
+		pad = Std.string(source.split("\n").length).length;
 		defines.set("neko", true);
 		defines.set("sys", true);
 	}
@@ -50,7 +52,11 @@ class HaxeMarkup
 	public function add(token:Token, ?span:String)
 	{
 		// add any non token chars to buffer (whitespace etc.)
-		if (token.pos.min > max) buf.add(source.substring(max, token.pos.min));
+		if (token.pos.min > max)
+		{
+			var str = source.substring(max, token.pos.min);
+			buf.add(str);
+		}
 
 		// add token string
 		max = token.pos.max;
@@ -236,6 +242,17 @@ class HaxeMarkup
 			token = stream.peek();
 		}
 
+		var pad = 4;
+		var l = 0;
+		var lines = buf.toString().split("\n");
+		buf = new StringBuf();
+		for (line in lines)
+		{
+			var num = StringTools.lpad(Std.string(l++), " ", pad);
+			num = '<span class="num">$num</span>';
+			buf.add(num + "  " + line + "\n");
+		}
+		
 		return buf.toString();
 	}
 }

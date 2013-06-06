@@ -1,7 +1,6 @@
 package xray;
 
 using haxe.macro.Tools;
-import haxe.macro.Context;
 import haxe.macro.Expr;
 using Lambda;
 

@@ -4,20 +4,29 @@ import haxe.macro.Context;
 import haxe.macro.Type;
 import haxe.macro.Expr;
 import xray.Data;
+using xray.TypeTools;
 using Lambda;
 
 class Processor
 {
-	public var cache:Map<String, Dynamic>;
+	var model:Model;
 
 	public function new()
 	{
-		cache = new Map<String, Dynamic>();
+		model = new Model();
 	}
 
-	public function process(types:Array<Type>)
+	public function process(types:Array<Type>):Model
 	{
-		return {types:types.map(processType), cache:cache};
+		types = types.map(processType);
+		
+		for (type in types)
+		{
+			var path:String = untyped type.toBaseType()._key;
+			model.type.set(path, type);
+		}
+
+		return model;
 	}
 
 	function processType(type:Type):Type
@@ -72,14 +81,17 @@ class Processor
 
 	function getBaseType(type:BaseType):Dynamic
 	{
-		var key = type.module + ":" + type.pack.concat([type.name]).join(".");
-		if (cache.exists(key)) return new PathData(key);
-		cache.set(key, type);
+		var key = type.pack.concat([type.name]).join(".");//type.module + ":" + 
+		if (model.baseType.exists(key)) return new PathData(key);
+		model.baseType.set(key, type);
 		
-		// untyped type._cached = key;
 		type.pos = processPos(type.pos);
 		type.params = type.params.map(processParam);
 		type.meta = processMeta(type.meta);
+
+		var file = untyped type.pos.file;
+		if (!model.file.exists(file))
+			model.file.set(file, sys.io.File.getContent(file));
 
 		return null;
 	}
@@ -207,7 +219,22 @@ class Processor
 		field.params = field.params.map(processParam);
 		field.meta = processMeta(field.meta);
 		field.pos = processPos(field.pos);
+
+		var typedExpr = field.expr();
+		if (typedExpr != null)
+		{
+			var expr = Context.getTypedExpr(typedExpr);
+			processExpr(expr);
+			untyped field.expr = expr;
+		}
+
 		return field;
+	}
+
+	function processExpr(expr:Expr)
+	{
+		expr.pos = processPos(expr.pos);
+		haxe.macro.ExprTools.iter(expr, processExpr);
 	}
 
 	function processArg(arg:{t:Type, opt:Bool, name:String})

@@ -89,12 +89,9 @@ class Macro
 
 	static function generate(types:Array<Type>)
 	{
-		var processor = new Processor();
-		var model = processor.process(types);
-
+		var model = new Processor().process(types);
 		var serializer = new Serializer();
 		serializer.serialize(model);
-
-		sys.io.File.saveContent("bin/" + platform + ".txt",  serializer.toString());
+		sys.io.File.saveContent("pages/" + platform + ".txt",  serializer.toString());
 	}
 }

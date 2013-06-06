@@ -3,90 +3,8 @@ var $hxClasses = {},$estr = function() { return js.Boot.__string_rec(this,''); }
 function $extend(from, fields) {
 	function inherit() {}; inherit.prototype = from; var proto = new inherit();
 	for (var name in fields) proto[name] = fields[name];
+	if( fields.toString !== Object.prototype.toString ) proto.toString = fields.toString;
 	return proto;
-}
-var EReg = function(r,opt) {
-	opt = opt.split("u").join("");
-	this.r = new RegExp(r,opt);
-};
-$hxClasses["EReg"] = EReg;
-EReg.__name__ = ["EReg"];
-EReg.prototype = {
-	map: function(s,f) {
-		var offset = 0;
-		var buf = new StringBuf();
-		do {
-			if(offset >= s.length) break; else if(!this.matchSub(s,offset)) {
-				buf.b += Std.string(HxOverrides.substr(s,offset,null));
-				break;
-			}
-			var p = this.matchedPos();
-			buf.b += Std.string(HxOverrides.substr(s,offset,p.pos - offset));
-			buf.b += Std.string(f(this));
-			if(p.len == 0) {
-				buf.b += Std.string(HxOverrides.substr(s,p.pos,1));
-				offset = p.pos + 1;
-			} else offset = p.pos + p.len;
-		} while(this.r.global);
-		if(!this.r.global && offset > 0 && offset < s.length) buf.b += Std.string(HxOverrides.substr(s,offset,null));
-		return buf.b;
-	}
-	,replace: function(s,by) {
-		return s.replace(this.r,by);
-	}
-	,split: function(s) {
-		var d = "#__delim__#";
-		return s.replace(this.r,d).split(d);
-	}
-	,matchSub: function(s,pos,len) {
-		if(len == null) len = -1;
-		return this.r.global?(function($this) {
-			var $r;
-			$this.r.lastIndex = pos;
-			$this.r.m = $this.r.exec(len < 0?s:HxOverrides.substr(s,0,pos + len));
-			var b = $this.r.m != null;
-			if(b) $this.r.s = s;
-			$r = b;
-			return $r;
-		}(this)):(function($this) {
-			var $r;
-			var b = $this.match(len < 0?HxOverrides.substr(s,pos,null):HxOverrides.substr(s,pos,len));
-			if(b) {
-				$this.r.s = s;
-				$this.r.m.index += pos;
-			}
-			$r = b;
-			return $r;
-		}(this));
-	}
-	,matchedPos: function() {
-		if(this.r.m == null) throw "No string matched";
-		return { pos : this.r.m.index, len : this.r.m[0].length};
-	}
-	,matchedRight: function() {
-		if(this.r.m == null) throw "No string matched";
-		var sz = this.r.m.index + this.r.m[0].length;
-		return this.r.s.substr(sz,this.r.s.length - sz);
-	}
-	,matchedLeft: function() {
-		if(this.r.m == null) throw "No string matched";
-		return this.r.s.substr(0,this.r.m.index);
-	}
-	,matched: function(n) {
-		return this.r.m != null && n >= 0 && n < this.r.m.length?this.r.m[n]:(function($this) {
-			var $r;
-			throw "EReg::matched";
-			return $r;
-		}(this));
-	}
-	,match: function(s) {
-		if(this.r.global) this.r.lastIndex = 0;
-		this.r.m = this.r.exec(s);
-		this.r.s = s;
-		return this.r.m != null;
-	}
-	,r: null
-	,__class__: EReg
 }
 var HxOverrides = function() { }
 $hxClasses["HxOverrides"] = HxOverrides;
@@ -601,8 +519,12 @@ StringBuf.prototype = {
 	,add: function(x) {
 		this.b += Std.string(x);
 	}
+	,get_length: function() {
+		return this.b.length;
+	}
 	,b: null
 	,__class__: StringBuf
+	,__properties__: {get_length:"get_length"}
 }
 var StringTools = function() { }
 $hxClasses["StringTools"] = StringTools;
@@ -859,599 +781,6 @@ Type.allEnums = function(e) {
 	}
 	return all;
 }
-var dox = {}
-dox.Model = function(types) {
-	this.typeMap = new haxe.ds.StringMap();
-	this.classTypes = [];
-	this.directSubclasses = new haxe.ds.StringMap();
-	this.indrectSubclasses = new haxe.ds.StringMap();
-	this.directImplementors = new haxe.ds.StringMap();
-	this.indrectImplementors = new haxe.ds.StringMap();
-	this.docs = new haxe.ds.StringMap();
-	this.packages = new haxe.ds.StringMap();
-	var _g = 0;
-	while(_g < types.length) {
-		var type = types[_g];
-		++_g;
-		var base = dox.TypeTools.toBaseType(type);
-		if(base == null) continue;
-		if(base.isPrivate) continue;
-		this.typeMap.set(base.name,base);
-		var pack = base.pack.join(".");
-		if(!this.packages.exists(pack)) this.packages.set(pack,[]);
-		this.packages.get(pack).push(type);
-		var $e = (type);
-		switch( $e[1] ) {
-		case 2:
-			var type_eTInst_1 = $e[3], t = $e[2];
-			this.classTypes.push(t.get());
-			break;
-		default:
-		}
-	}
-	var _g = 0;
-	while(_g < types.length) {
-		var type = types[_g];
-		++_g;
-		var base = dox.TypeTools.toBaseType(type);
-		if(base == null) continue;
-		if(base.isPrivate) continue;
-		var id = this.getClassTypeID(base);
-		if(base.doc != null) this.docs.set(id,this.parseDoc(base.doc));
-	}
-	var _g = 0, _g1 = this.classTypes;
-	while(_g < _g1.length) {
-		var type = _g1[_g];
-		++_g;
-		var _g2 = 0, _g3 = type.interfaces;
-		while(_g2 < _g3.length) {
-			var inter = _g3[_g2];
-			++_g2;
-			var id = this.getClassTypeID(inter.t.get());
-			if(!this.directImplementors.exists(id)) this.directImplementors.set(id,[]);
-			this.directImplementors.get(id).push(type);
-		}
-		if(type.superClass == null) continue;
-		var sup = type.superClass.t.get();
-		var id = this.getClassTypeID(sup);
-		if(!this.directSubclasses.exists(id)) this.directSubclasses.set(id,[]);
-		this.directSubclasses.get(id).push(type);
-		if(sup.superClass == null) continue;
-		var sup1 = sup.superClass.t.get();
-		while(sup1 != null) {
-			var id1 = this.getClassTypeID(sup1);
-			if(!this.indrectSubclasses.exists(id1)) this.indrectSubclasses.set(id1,[]);
-			this.indrectSubclasses.get(id1).push(type);
-			if(sup1.superClass == null) break;
-			sup1 = sup1.superClass.t.get();
-		}
-	}
-};
-$hxClasses["dox.Model"] = dox.Model;
-dox.Model.__name__ = ["dox","Model"];
-dox.Model.prototype = {
-	getClassTypeID: function(type) {
-		return type.pack.join(".") + "." + type.module + "." + type.name;
-	}
-	,replaceLinks: function(ereg) {
-		var id = ereg.matched(1);
-		var parts = id.split(".");
-		var href = "#" + parts[parts.length - 1];
-		if(this.typeMap.exists(parts[0])) {
-			var base = this.typeMap.get(parts[0]);
-			href = dox.Printer.baseurl + "/" + base.pack.concat([base.name]).join("/") + ".html";
-			if(parts.length > 1) href += "#" + parts[parts.length - 1];
-		}
-		return "<code><a href=\"" + href + "\">" + id + "</a></code>";
-	}
-	,redirectLinks: function(ereg) {
-		var href = ereg.matched(1);
-		if(href.indexOf(".md") == -1) return ereg.matched(0);
-		href = href.split(".md").join(".html");
-		return "href=\"" + href + "\"";
-	}
-	,markupFile: function(path) {
-		return path;
-	}
-	,markup: function(source) {
-		return source;
-	}
-	,parseDoc: function(doc) {
-		if(doc == null) return "<p></p>";
-		var orig = doc;
-		var ereg = new EReg("^([\t ]+).+","m");
-		if(ereg.match(doc)) {
-			var tabs = new EReg("^" + ereg.matched(1),"gm");
-			doc = tabs.replace(doc,"");
-		}
-		if(doc.charAt(doc.length - 1) == "*") doc = HxOverrides.substr(doc,0,doc.length - 1);
-		doc = StringTools.trim(doc);
-		return this.markup(doc);
-	}
-	,getDescription: function(type) {
-		var doc = this.getDoc(type);
-		return doc.substring(0,doc.indexOf("</p>") + 4);
-	}
-	,getDoc: function(type) {
-		var id = this.getClassTypeID(type);
-		if(!this.docs.exists(id)) return "<p></p>";
-		return this.docs.get(id);
-	}
-	,getDirectImplementors: function(type) {
-		var id = this.getClassTypeID(type);
-		if(!this.directImplementors.exists(id)) return [];
-		return this.directImplementors.get(id);
-	}
-	,getIndirectSubclasses: function(type) {
-		var id = this.getClassTypeID(type);
-		if(!this.indrectSubclasses.exists(id)) return [];
-		return this.indrectSubclasses.get(id);
-	}
-	,getDirectSubclasses: function(type) {
-		var id = this.getClassTypeID(type);
-		if(!this.directSubclasses.exists(id)) return [];
-		return this.directSubclasses.get(id);
-	}
-	,getSubClasses: function(type) {
-		return this.getIndirectSubclasses(type).concat(this.getDirectSubclasses(type));
-	}
-	,packages: null
-	,docs: null
-	,indrectImplementors: null
-	,directImplementors: null
-	,indrectSubclasses: null
-	,directSubclasses: null
-	,classTypes: null
-	,typeMap: null
-	,__class__: dox.Model
-}
-dox.Printer = function(model) {
-	this.model = model;
-	this.buf = new StringBuf();
-	this.nav = "";
-	var packs = (function($this) {
-		var $r;
-		var _g = [];
-		var $it0 = model.packages.keys();
-		while( $it0.hasNext() ) {
-			var key = $it0.next();
-			_g.push(key);
-		}
-		$r = _g;
-		return $r;
-	}(this));
-	packs.sort(Reflect.compare);
-	var _g1 = 0;
-	while(_g1 < packs.length) {
-		var pack = packs[_g1];
-		++_g1;
-		var parts = pack.split(".");
-		if(parts.length == 1 && parts[0] == "") parts = [];
-		parts.push("index.html");
-		var href = parts.join("/");
-		if(pack == "") pack = "top level";
-		this.nav += "<li><a href=\"" + dox.Printer.baseurl + "/" + href + "\">" + pack + "</a></li>\n";
-	}
-};
-$hxClasses["dox.Printer"] = dox.Printer;
-dox.Printer.__name__ = ["dox","Printer"];
-dox.Printer.prototype = {
-	typeKind: function(type) {
-		return (function($this) {
-			var $r;
-			var $e = (type);
-			switch( $e[1] ) {
-			case 3:
-				$r = "typedef";
-				break;
-			case 2:
-				var type_eTInst_1 = $e[3], t = $e[2];
-				$r = t.get().isInterface?"interface":"class";
-				break;
-			case 1:
-				$r = "enum";
-				break;
-			case 8:
-				$r = "abstract";
-				break;
-			default:
-				$r = null;
-			}
-			return $r;
-		}(this));
-	}
-	,baseTypePath: function(type) {
-		return type.pack.concat([type.name]);
-	}
-	,baseTypeURL: function(type) {
-		return "javascript:client.filter('" + this.baseTypePath(type).join(".") + "');";
-		return dox.Printer.baseurl + "/" + this.baseTypePath(type).join("/") + ".html";
-	}
-	,baseTypeLink: function(type) {
-		var href = this.baseTypeURL(type);
-		return "<a href=\"" + href + "\">" + type.name + "</a>";
-	}
-	,argLink: function(arg) {
-		var opt = arg.opt?"?":"";
-		var name = arg.name;
-		var link = this.typeLink(arg.t);
-		return "" + opt + "<span class=\"i\">" + name + "</span>:" + link;
-	}
-	,argType: function(arg) {
-		return arg.t;
-	}
-	,refLink: function(ref) {
-		return this.baseTypeLink(ref.t.get()) + this.paramsLink(ref.params);
-	}
-	,paramsLink: function(params) {
-		if(params.length == 0) return "";
-		return "&lt;" + params.map($bind(this,this.typeLink)).join(", ") + "&gt;";
-	}
-	,fieldLink: function(field) {
-		return field.name + ":" + this.typeLink(field.type);
-	}
-	,typeLink: function(type) {
-		if(type == null) return null;
-		var base = dox.TypeTools.toBaseType(type);
-		if(base == null) return (function($this) {
-			var $r;
-			var $e = (type);
-			switch( $e[1] ) {
-			case 4:
-				var ret = $e[3], args = $e[2];
-				$r = args.map($bind($this,$this.argType)).concat([ret]).map($bind($this,$this.typeLink)).join(" -> ");
-				break;
-			case 6:
-				$r = "<a href=\"" + dox.Printer.baseurl + "/Dynamic.html\">Dynamic</a>";
-				break;
-			case 5:
-				var a = $e[2];
-				$r = "{ " + a.get().fields.map($bind($this,$this.fieldLink)).join(", ") + " }";
-				break;
-			default:
-				$r = StringTools.htmlEscape(Std.string(type));
-			}
-			return $r;
-		}(this));
-		var link = this.baseTypeLink(base);
-		var $e = (type);
-		switch( $e[1] ) {
-		case 3:
-			var params = $e[3], type_eTType_0 = $e[2];
-			link += this.paramsLink(params);
-			break;
-		case 2:
-			var params = $e[3], type_eTInst_0 = $e[2];
-			link += this.paramsLink(params);
-			break;
-		case 1:
-			var params = $e[3], type_eTEnum_0 = $e[2];
-			link += this.paramsLink(params);
-			break;
-		default:
-		}
-		return link;
-	}
-	,printPackTypes: function(types,title) {
-		if(types.length == 0) return;
-		this.buf.b += Std.string("<h2>" + title + "</h2>");
-		this.buf.b += "<table class=\"table table-condensed\"><tbody>";
-		var _g = 0;
-		while(_g < types.length) {
-			var type = types[_g];
-			++_g;
-			var link = this.baseTypeLink(type);
-			var desc = this.model.getDescription(type);
-			this.buf.b += Std.string("<tr><td width=\"200\">" + link + "</td><td>" + desc + "</td></tr>");
-		}
-		this.buf.b += "</tbody></table>";
-	}
-	,matchAll: function(ereg,string,groups) {
-		if(groups == null) groups = 0;
-		var matches = [];
-		var pos = { pos : 0, len : 0};
-		while(ereg.matchSub(string,pos.pos + pos.len)) {
-			pos = ereg.matchedPos();
-			var match = [];
-			var _g1 = 0, _g = groups + 1;
-			while(_g1 < _g) {
-				var i = _g1++;
-				match.push(ereg.matched(i));
-			}
-			matches.push(match);
-		}
-		return matches;
-	}
-	,shiftHeadings: function(doc,start,removeTop) {
-		if(removeTop == null) removeTop = false;
-		var matches = this.matchAll(new EReg("<h([1-9])>","i"),doc,1);
-		var levels = matches.map(function(m) {
-			return m[1];
-		});
-		levels.sort(Reflect.compare);
-		var top = Std.parseInt(levels[0]);
-		if(removeTop) doc = new EReg("<h" + top + ">.+?</h" + top + ">","i").replace(doc,"");
-		doc = new EReg("<(/?)h([1-9])>","gi").map(doc,function(e) {
-			var level = Std.parseInt(e.matched(2)) - top + start;
-			return "<" + e.matched(1) + "h" + level + ">";
-		});
-		return doc;
-	}
-	,printPack: function(pack) {
-		this.buf = new StringBuf();
-		if(pack == "") this.buf.b += "<h1>top level<h1>"; else this.buf.b += Std.string("<h1><span class=\"d\">package</span> " + pack + "</h1>");
-		var interfaces = [];
-		var classes = [];
-		var enums = [];
-		var typedefs = [];
-		var abstracts = [];
-		var types = this.model.packages.get(pack);
-		var _g = 0;
-		while(_g < types.length) {
-			var type = types[_g];
-			++_g;
-			var $e = (type);
-			switch( $e[1] ) {
-			case 2:
-				var type_eTInst_1 = $e[3], t = $e[2];
-				var ref = t.get();
-				if(ref.isInterface) interfaces.push(ref); else classes.push(ref);
-				break;
-			case 1:
-				var type_eTEnum_1 = $e[3], t = $e[2];
-				enums.push(t.get());
-				break;
-			case 3:
-				var type_eTType_1 = $e[3], t = $e[2];
-				typedefs.push(t.get());
-				break;
-			case 8:
-				var type_eTAbstract_1 = $e[3], t = $e[2];
-				abstracts.push(t.get());
-				break;
-			default:
-			}
-		}
-		this.printPackTypes(interfaces,"Interfaces");
-		this.printPackTypes(classes,"Classes");
-		this.printPackTypes(typedefs,"Type Definitions");
-		this.printPackTypes(enums,"Enums");
-		this.printPackTypes(abstracts,"Abstracts");
-	}
-	,printDoc: function(doc) {
-		this.printMarkDownDoc(this.model.parseDoc(doc));
-	}
-	,printMarkDownDoc: function(doc) {
-		this.buf.b += Std.string("<div class=\"doc\">" + doc + "</div>\n");
-	}
-	,printClassField: function(field) {
-		var name = field.name;
-		var $e = (field.kind);
-		switch( $e[1] ) {
-		case 0:
-			var write = $e[3], field_fkind_eFVar_0 = $e[2];
-			var link = this.typeLink(field.type);
-			this.buf.b += Std.string("<a name=\"" + name + "\"></a><h3><code><span class=\"k\">var</span> <span class=\"i\">" + name + "</span>:" + link + "</code></h3>\n");
-			break;
-		case 1:
-			var $e = (field.type);
-			switch( $e[1] ) {
-			case 4:
-				var ret = $e[3], args = $e[2];
-				var argLinks = args.map($bind(this,this.argLink)).join(", ");
-				var retLink = this.typeLink(ret);
-				this.buf.b += Std.string("<a name=\"" + name + "\"></a><h3><code><span class=\"k\">function</span> <span class=\"i\">" + name + "</span>(" + argLinks + "):" + retLink + "</code></h3>\n");
-				break;
-			default:
-			}
-			break;
-		}
-		this.printDoc(field.doc);
-	}
-	,printClassFields: function(fields,title) {
-		var fields1 = fields.filter(function(field) {
-			return field.isPublic;
-		});
-		if(fields1.length > 0) {
-			this.buf.b += Std.string("<h2>" + title + "</h2>\n");
-			var _g = 0;
-			while(_g < fields1.length) {
-				var field = fields1[_g];
-				++_g;
-				this.printClassField(field);
-			}
-		}
-	}
-	,printRelatedTypes: function(types,title) {
-		if(types.length > 0) {
-			var table = "<table class='table table-condensed'><tbody>";
-			var _g = 0;
-			while(_g < types.length) {
-				var type = types[_g];
-				++_g;
-				var link = this.baseTypeLink(type);
-				var desc = this.model.getDescription(type);
-				table += "<tr><td width=\"200\">" + link + "</td><td>" + desc + "</td></tr>";
-			}
-			table += "</tbody></table>";
-			this.buf.b += "<table class=\"related-types toggle\" style=\"margin-top:16px;\"><tbody>";
-			this.buf.b += Std.string("<tr><td colspan=\"2\">" + title + "</td></tr>");
-			var links = types.map($bind(this,this.baseTypeLink)).join(", ");
-			this.buf.b += "<tr>";
-			this.buf.b += Std.string("<td width=\"12\" style=\"vertical-align:top;\"><a href=\"#\" onclick=\"toggleInherited(this)\"><img style=\"padding-top:4px;\" src=\"" + dox.Printer.baseurl + "/triangle-closed.png\"></a></td>");
-			this.buf.b += Std.string("<td class=\"toggle-hide\">" + links + "</td>");
-			this.buf.b += Std.string("<td class=\"toggle-show\">" + table + "</td>");
-			this.buf.b += "</tr>";
-			this.buf.b += "</tbody></table>";
-		}
-	}
-	,printTypeNav: function(type) {
-		this.buf.b += "<div class=\"package-nav\">";
-		var nav = [];
-		var parts = [];
-		var _g = 0, _g1 = type.pack;
-		while(_g < _g1.length) {
-			var pack = _g1[_g];
-			++_g;
-			parts.push(pack);
-			var path = parts.join("/");
-			nav.push("<a href=\"" + dox.Printer.baseurl + "/" + path + "\">" + pack + "</a>");
-		}
-		this.buf.b += Std.string("<a href=\"" + dox.Printer.baseurl + "\">root</a> " + nav.join("."));
-		this.buf.b += "</div>";
-	}
-	,printAbstract: function(type) {
-		this.printMarkDownDoc(this.model.getDoc(type));
-	}
-	,printDef: function(type) {
-		this.printMarkDownDoc(this.model.getDoc(type));
-		var $e = (type.type);
-		switch( $e[1] ) {
-		case 5:
-			var a = $e[2];
-			var ref = a.get();
-			this.printClassFields(ref.fields,"Instance Fields");
-			break;
-		default:
-		}
-	}
-	,printEnumField: function(field) {
-		var name = field.name;
-		var $e = (field.type);
-		switch( $e[1] ) {
-		case 4:
-			var field_ftype_eTFun_1 = $e[3], args = $e[2];
-			var argLinks = args.map($bind(this,this.argLink)).join(", ");
-			if(argLinks.length > 0) argLinks = "(" + argLinks + ")";
-			this.buf.b += Std.string("<h3><code>" + name + argLinks + "</code></h3>\n");
-			break;
-		default:
-			this.buf.b += Std.string("<h3><code>" + name + "</code></h3>\n");
-		}
-		this.printDoc(field.doc);
-	}
-	,printEnum: function(type) {
-		this.printMarkDownDoc(this.model.getDoc(type));
-		this.buf.b += "<h2>Constructs:</h2>\n";
-		var $it0 = type.constructs.iterator();
-		while( $it0.hasNext() ) {
-			var field = $it0.next();
-			this.printEnumField(field);
-		}
-	}
-	,printClass: function(type) {
-		if(type.superClass != null) {
-			var link = this.refLink(type.superClass);
-			this.buf.b += Std.string("<div>extends " + link + "</div>\n");
-		}
-		if(type.interfaces.length > 0) {
-			var links = type.interfaces.map($bind(this,this.refLink)).join(" ");
-			this.buf.b += Std.string("<div>implements " + links + "</div>\n");
-		}
-		this.printRelatedTypes(this.model.getDirectSubclasses(type),"Direct Subclasses");
-		this.printRelatedTypes(this.model.getIndirectSubclasses(type),"Indirect Subclasses");
-		this.printRelatedTypes(this.model.getDirectImplementors(type),"Direct Implementors");
-		this.printMarkDownDoc(this.model.getDoc(type));
-		this.printClassFields(type.statics.get(),"Class Fields");
-		this.printClassFields(type.fields.get(),"Instance Fields");
-	}
-	,getString: function() {
-		return this.buf.b;
-	}
-	,getHtml: function() {
-		return this.html(this.buf.b);
-	}
-	,html: function(body) {
-		return "<!DOCTYPE html>\n<html>\n\t<head>\n\t\t<meta charset=\"utf-8\"> \n\t\t<link href=\"http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/css/bootstrap-combined.min.css\" rel=\"stylesheet\">\n\t\t<script src=\"http://code.jquery.com/jquery-1.9.1.min.js\"></script>\n\t\t<script src=\"http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.1/js/bootstrap.min.js\"></script>\n\t\t<link href=\"" + dox.Printer.baseurl + "/styles.css\" rel=\"stylesheet\">\n\t\t<script type=\"text/javascript\" src=\"" + dox.Printer.baseurl + "/index.js\"></script>\n\t</head>\n\t<body>\n\t\t<div class=\"container-fluid\">\n\t\t\t<div class=\"navbar navbar-inverse navbar-fixed-top\">\n\t\t\t\t<div class=\"navbar-inner\">\n\t\t\t\t\t<ul class=\"nav\">\n\t\t\t\t\t\t<li><a href=\"#\">MDK</a></li>\n\t\t\t\t\t\t<li><a href=\"#\">Guides</a></li>\n\t\t\t\t\t\t<li class=\"active\"><a href=\"#\">API</a></li>\n\t\t\t\t\t</ul>\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t\t<div class=\"row-fluid\">\n\t\t\t\t<div class=\"packages\">" + this.nav + "</div>\n\t\t\t\t<div class=\"content\">" + body + "</div>\n\t\t\t</div>\n\t\t</div>\n\t</body>\n</html>";
-	}
-	,printType: function(type) {
-		var base = dox.TypeTools.toBaseType(type);
-		if(base == null) return;
-		this.buf = new StringBuf();
-		var kind = this.typeKind(type);
-		var link = this.typeLink(type);
-		this.buf.b += Std.string("<h1><span class=\"d\">" + kind + "</span> " + link + "</h1>\n");
-		var $e = (type);
-		switch( $e[1] ) {
-		case 3:
-			var type_eTType_1 = $e[3], t = $e[2];
-			this.printDef(t.get());
-			break;
-		case 2:
-			var type_eTInst_1 = $e[3], t = $e[2];
-			this.printClass(t.get());
-			break;
-		case 1:
-			var type_eTEnum_1 = $e[3], t = $e[2];
-			this.printEnum(t.get());
-			break;
-		case 8:
-			var type_eTAbstract_1 = $e[3], t = $e[2];
-			this.printAbstract(t.get());
-			break;
-		default:
-		}
-	}
-	,nav: null
-	,buf: null
-	,model: null
-	,__class__: dox.Printer
-}
-dox.TypeTools = function() { }
-$hxClasses["dox.TypeTools"] = dox.TypeTools;
-dox.TypeTools.__name__ = ["dox","TypeTools"];
-dox.TypeTools.toBaseType = function(type) {
-	if(type == null) return null;
-	return (function($this) {
-		var $r;
-		var $e = (type);
-		switch( $e[1] ) {
-		case 3:
-			var type_eTType_1 = $e[3], t = $e[2];
-			$r = t.get();
-			break;
-		case 7:
-			var f = $e[2];
-			$r = dox.TypeTools.toBaseType(f());
-			break;
-		case 2:
-			var type_eTInst_1 = $e[3], t = $e[2];
-			$r = t.get();
-			break;
-		case 1:
-			var type_eTEnum_1 = $e[3], t = $e[2];
-			$r = t.get();
-			break;
-		case 8:
-			var type_eTAbstract_1 = $e[3], t = $e[2];
-			$r = t.get();
-			break;
-		default:
-			$r = null;
-		}
-		return $r;
-	}(this));
-}
-dox.TypeTools.isBaseType = function(type) {
-	return dox.TypeTools.toBaseType(type) != null;
-}
-dox.TypeTools.isPublic = function(type) {
-	return !dox.TypeTools.isPrivate(type);
-}
-dox.TypeTools.isPrivate = function(type) {
-	var base = dox.TypeTools.toBaseType(type);
-	return base == null?false:base.isPrivate;
-}
-dox.TypeTools.getPath = function(type) {
-	var base = dox.TypeTools.toBaseType(type);
-	if(base == null) return null;
-	return base.pack.concat([base.name]);
-}
-dox.TypeTools.getName = function(type) {
-	var path = dox.TypeTools.getPath(type);
-	if(path == null) return null;
-	return path.join(".");
-}
 var haxe = {}
 haxe.Http = function(url) {
 	this.url = url;
@@ -1558,6 +887,15 @@ haxe.Http.prototype = {
 	,responseData: null
 	,url: null
 	,__class__: haxe.Http
+}
+haxe.Log = function() { }
+$hxClasses["haxe.Log"] = haxe.Log;
+haxe.Log.__name__ = ["haxe","Log"];
+haxe.Log.trace = function(v,infos) {
+	js.Boot.__trace(v,infos);
+}
+haxe.Log.clear = function() {
+	js.Boot.__clear_trace();
 }
 haxe.Unserializer = function(buf) {
 	this.buf = buf;
@@ -1847,27 +1185,27 @@ haxe.ds.BalancedTree.prototype = {
 		return Reflect.compare(k1,k2);
 	}
 	,balance: function(l,k,v,r) {
-		var hl = l == null?0:l.height;
-		var hr = r == null?0:r.height;
+		var hl = l == null?0:l._height;
+		var hr = r == null?0:r._height;
 		return hl > hr + 2?(function($this) {
 			var $r;
 			var _this = l.left;
-			$r = _this == null?0:_this.height;
+			$r = _this == null?0:_this._height;
 			return $r;
 		}(this)) >= (function($this) {
 			var $r;
 			var _this = l.right;
-			$r = _this == null?0:_this.height;
+			$r = _this == null?0:_this._height;
 			return $r;
 		}(this))?new haxe.ds.TreeNode(l.left,l.key,l.value,new haxe.ds.TreeNode(l.right,k,v,r)):new haxe.ds.TreeNode(new haxe.ds.TreeNode(l.left,l.key,l.value,l.right.left),l.right.key,l.right.value,new haxe.ds.TreeNode(l.right.right,k,v,r)):hr > hl + 2?(function($this) {
 			var $r;
 			var _this = r.right;
-			$r = _this == null?0:_this.height;
+			$r = _this == null?0:_this._height;
 			return $r;
 		}(this)) > (function($this) {
 			var $r;
 			var _this = r.left;
-			$r = _this == null?0:_this.height;
+			$r = _this == null?0:_this._height;
 			return $r;
 		}(this))?new haxe.ds.TreeNode(new haxe.ds.TreeNode(l,k,v,r.left),r.key,r.value,r.right):new haxe.ds.TreeNode(new haxe.ds.TreeNode(l,k,v,r.left.left),r.left.key,r.left.value,new haxe.ds.TreeNode(r.left.right,r.key,r.value,r.right)):new haxe.ds.TreeNode(l,k,v,r,(hl > hr?hl:hr) + 1);
 	}
@@ -1889,15 +1227,15 @@ haxe.ds.BalancedTree.prototype = {
 	}
 	,keysLoop: function(node,acc) {
 		if(node != null) {
-			acc.push(node.key);
 			this.keysLoop(node.left,acc);
+			acc.push(node.key);
 			this.keysLoop(node.right,acc);
 		}
 	}
 	,iteratorLoop: function(node,acc) {
 		if(node != null) {
-			acc.push(node.value);
 			this.iteratorLoop(node.left,acc);
+			acc.push(node.value);
 			this.iteratorLoop(node.right,acc);
 		}
 	}
@@ -1909,7 +1247,7 @@ haxe.ds.BalancedTree.prototype = {
 	,setLoop: function(k,v,node) {
 		if(node == null) return new haxe.ds.TreeNode(null,k,v,null);
 		var c = this.compare(k,node.key);
-		return c == 0?new haxe.ds.TreeNode(node.left,k,v,node.right,node == null?0:node.height):c < 0?(function($this) {
+		return c == 0?new haxe.ds.TreeNode(node.left,k,v,node.right,node == null?0:node._height):c < 0?(function($this) {
 			var $r;
 			var nl = $this.setLoop(k,v,node.left);
 			$r = $this.balance(nl,node.key,node.value,node.right);
@@ -1931,43 +1269,35 @@ haxe.ds.BalancedTree.prototype = {
 		this.iteratorLoop(this.root,ret);
 		return HxOverrides.iter(ret);
 	}
-	,exists: function(k) {
+	,exists: function(key) {
 		var node = this.root;
 		while(node != null) {
-			var c = this.compare(k,node.key);
+			var c = this.compare(key,node.key);
 			if(c == 0) return true; else if(c < 0) node = node.left; else node = node.right;
 		}
 		return false;
 	}
-	,remove: function(k) {
-		return (function($this) {
-			var $r;
-			try {
-				$r = (function($this) {
-					var $r;
-					$this.root = $this.removeLoop(k,$this.root);
-					$r = true;
-					return $r;
-				}($this));
-			} catch( e ) {
-				if( js.Boot.__instanceof(e,String) ) {
-					$r = false;
-				} else throw(e);
-			}
-			return $r;
-		}(this));
+	,remove: function(key) {
+		try {
+			this.root = this.removeLoop(key,this.root);
+			return true;
+		} catch( e ) {
+			if( js.Boot.__instanceof(e,String) ) {
+				return false;
+			} else throw(e);
+		}
 	}
-	,get: function(k) {
+	,get: function(key) {
 		var node = this.root;
 		while(node != null) {
-			var c = this.compare(k,node.key);
+			var c = this.compare(key,node.key);
 			if(c == 0) return node.value;
 			if(c < 0) node = node.left; else node = node.right;
 		}
 		return null;
 	}
-	,set: function(k,v) {
-		this.root = this.setLoop(k,v,this.root);
+	,set: function(key,value) {
+		this.root = this.setLoop(key,value,this.root);
 	}
 	,root: null
 	,__class__: haxe.ds.BalancedTree
@@ -1978,27 +1308,27 @@ haxe.ds.TreeNode = function(l,k,v,r,h) {
 	this.key = k;
 	this.value = v;
 	this.right = r;
-	if(h == -1) this.height = ((function($this) {
+	if(h == -1) this._height = ((function($this) {
 		var $r;
 		var _this = $this.left;
-		$r = _this == null?0:_this.height;
+		$r = _this == null?0:_this._height;
 		return $r;
 	}(this)) > (function($this) {
 		var $r;
 		var _this = $this.right;
-		$r = _this == null?0:_this.height;
+		$r = _this == null?0:_this._height;
 		return $r;
 	}(this))?(function($this) {
 		var $r;
 		var _this = $this.left;
-		$r = _this == null?0:_this.height;
+		$r = _this == null?0:_this._height;
 		return $r;
 	}(this)):(function($this) {
 		var $r;
 		var _this = $this.right;
-		$r = _this == null?0:_this.height;
+		$r = _this == null?0:_this._height;
 		return $r;
-	}(this))) + 1; else this.height = h;
+	}(this))) + 1; else this._height = h;
 };
 $hxClasses["haxe.ds.TreeNode"] = haxe.ds.TreeNode;
 haxe.ds.TreeNode.__name__ = ["haxe","ds","TreeNode"];
@@ -2006,13 +1336,12 @@ haxe.ds.TreeNode.prototype = {
 	toString: function() {
 		return (this.left == null?"":this.left.toString() + ", ") + ("" + Std.string(this.key) + "=" + Std.string(this.value)) + (this.right == null?"":", " + this.right.toString());
 	}
-	,height: null
+	,_height: null
 	,value: null
 	,key: null
 	,right: null
 	,left: null
 	,__class__: haxe.ds.TreeNode
-	,__properties__: {get_height:"get_height"}
 }
 haxe.ds.EnumValueMap = function() {
 	haxe.ds.BalancedTree.call(this);
@@ -2478,8 +1807,12 @@ haxe.io.BytesBuffer.prototype = {
 	,addByte: function($byte) {
 		this.b.push($byte);
 	}
+	,get_length: function() {
+		return this.b.length;
+	}
 	,b: null
 	,__class__: haxe.io.BytesBuffer
+	,__properties__: {get_length:"get_length"}
 }
 haxe.io.Input = function() { }
 $hxClasses["haxe.io.Input"] = haxe.io.Input;
@@ -2652,6 +1985,7 @@ haxe.io.BytesInput = function(b,pos,len) {
 	this.b = b.b;
 	this.pos = pos;
 	this.len = len;
+	this.totlen = len;
 };
 $hxClasses["haxe.io.BytesInput"] = haxe.io.BytesInput;
 haxe.io.BytesInput.__name__ = ["haxe","io","BytesInput"];
@@ -2680,14 +2014,18 @@ haxe.io.BytesInput.prototype = $extend(haxe.io.Input.prototype,{
 	,set_position: function(p) {
 		return this.pos = p;
 	}
+	,get_length: function() {
+		return this.totlen;
+	}
 	,get_position: function() {
 		return this.pos;
 	}
+	,totlen: null
 	,len: null
 	,pos: null
 	,b: null
 	,__class__: haxe.io.BytesInput
-	,__properties__: $extend(haxe.io.Input.prototype.__properties__,{set_position:"set_position",get_position:"get_position"})
+	,__properties__: $extend(haxe.io.Input.prototype.__properties__,{set_position:"set_position",get_position:"get_position",get_length:"get_length"})
 });
 haxe.io.Eof = function() {
 };
@@ -2720,9 +2058,6 @@ haxe.io.StringInput.prototype = $extend(haxe.io.BytesInput.prototype,{
 	__class__: haxe.io.StringInput
 });
 haxe.macro = {}
-haxe.macro.Compiler = function() { }
-$hxClasses["haxe.macro.Compiler"] = haxe.macro.Compiler;
-haxe.macro.Compiler.__name__ = ["haxe","macro","Compiler"];
 haxe.macro.ComplexTypeTools = function() { }
 $hxClasses["haxe.macro.ComplexTypeTools"] = haxe.macro.ComplexTypeTools;
 haxe.macro.ComplexTypeTools.__name__ = ["haxe","macro","ComplexTypeTools"];
@@ -2922,7 +2257,7 @@ $hxClasses["haxe.macro.ExprTools"] = haxe.macro.ExprTools;
 haxe.macro.ExprTools.__name__ = ["haxe","macro","ExprTools"];
 haxe.macro.ExprTools.toFieldExpr = function(sl) {
 	return Lambda.fold(sl,function(s,e) {
-		return e == null?{ expr : haxe.macro.ExprDef.EConst(haxe.macro.Constant.CIdent(s)), pos : { file : "/usr/lib/haxe/std/haxe/macro/ExprTools.hx", min : 1656, max : 1659}}:{ expr : haxe.macro.ExprDef.EField(e,s), pos : { file : "/usr/lib/haxe/std/haxe/macro/ExprTools.hx", min : 1670, max : 1675}};
+		return e == null?{ expr : haxe.macro.ExprDef.EConst(haxe.macro.Constant.CIdent(s)), pos : { file : "/ws/haxe/std/haxe/macro/ExprTools.hx", min : 1618, max : 1621}}:{ expr : haxe.macro.ExprDef.EField(e,s), pos : { file : "/ws/haxe/std/haxe/macro/ExprTools.hx", min : 1632, max : 1637}};
 	},null);
 }
 haxe.macro.ExprTools.toString = function(e) {
@@ -3317,7 +2652,7 @@ haxe.macro.Printer.prototype = {
 			var $e = (t.kind);
 			switch( $e[1] ) {
 			case 0:
-				$r = "enum " + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(",") + ">":"") + " {\n" + ((function($this) {
+				$r = "enum " + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(", ") + ">":"") + " {\n" + ((function($this) {
 					var $r;
 					var _g = [];
 					{
@@ -3353,7 +2688,7 @@ haxe.macro.Printer.prototype = {
 				}($this))).join("\n") + "\n}";
 				break;
 			case 1:
-				$r = "typedef " + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(",") + ">":"") + " = {\n" + ((function($this) {
+				$r = "typedef " + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(", ") + ">":"") + " = {\n" + ((function($this) {
 					var $r;
 					var _g = [];
 					{
@@ -3370,7 +2705,7 @@ haxe.macro.Printer.prototype = {
 				break;
 			case 2:
 				var isInterface = $e[4], interfaces = $e[3], superClass = $e[2];
-				$r = (isInterface?"interface ":"class ") + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(",") + ">":"") + (superClass != null?" extends " + $this.printTypePath(superClass):"") + (interfaces != null?(isInterface?(function($this) {
+				$r = (isInterface?"interface ":"class ") + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(", ") + ">":"") + (superClass != null?" extends " + $this.printTypePath(superClass):"") + (interfaces != null?(isInterface?(function($this) {
 					var $r;
 					var _g = [];
 					{
@@ -3434,11 +2769,11 @@ haxe.macro.Printer.prototype = {
 				break;
 			case 3:
 				var ct = $e[2];
-				$r = "typedef " + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(",") + ">":"") + " = " + $this.printComplexType(ct) + ";";
+				$r = "typedef " + t.name + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(", ") + ">":"") + " = " + $this.printComplexType(ct) + ";";
 				break;
 			case 4:
 				var to = $e[4], from = $e[3], tthis = $e[2];
-				$r = "abstract " + t.name + (tthis == null?"":"(" + $this.printComplexType(tthis) + ")") + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(",") + ">":"") + (from == null?"":((function($this) {
+				$r = "abstract " + t.name + (tthis == null?"":"(" + $this.printComplexType(tthis) + ")") + (t.params.length > 0?"<" + t.params.map($bind($this,$this.printTypeParamDecl)).join(", ") + ">":"") + (from == null?"":((function($this) {
 					var $r;
 					var _g = [];
 					{
@@ -3525,7 +2860,7 @@ haxe.macro.Printer.prototype = {
 				break;
 			case 2:
 				var e2 = $e[4], e1 = $e[3], op = $e[2];
-				$r = "" + $this.printExpr(e1) + $this.printBinop(op) + $this.printExpr(e2);
+				$r = "" + $this.printExpr(e1) + " " + $this.printBinop(op) + " " + $this.printExpr(e2);
 				break;
 			case 3:
 				var n = $e[3], e1 = $e[2];
@@ -3537,21 +2872,21 @@ haxe.macro.Printer.prototype = {
 				break;
 			case 5:
 				var fl = $e[2];
-				$r = "{" + fl.map(function(fld) {
-					return "" + fld.field + ":" + _g.printExpr(fld.expr);
+				$r = "{ " + fl.map(function(fld) {
+					return "" + fld.field + " : " + _g.printExpr(fld.expr) + " ";
 				}).join(",") + "}";
 				break;
 			case 6:
 				var el = $e[2];
-				$r = "[" + $this.printExprs(el,",") + "]";
+				$r = "[" + $this.printExprs(el,", ") + "]";
 				break;
 			case 7:
 				var el = $e[3], e1 = $e[2];
-				$r = "" + $this.printExpr(e1) + "(" + $this.printExprs(el,",") + ")";
+				$r = "" + $this.printExpr(e1) + "(" + $this.printExprs(el,", ") + ")";
 				break;
 			case 8:
 				var el = $e[3], tp = $e[2];
-				$r = "new " + $this.printTypePath(tp) + "(" + $this.printExprs(el,",") + ")";
+				$r = "new " + $this.printTypePath(tp) + "(" + $this.printExprs(el,", ") + ")";
 				break;
 			case 9:
 				var e1 = $e[4], e_fexpr_eEUnop_1 = $e[3], op = $e[2];
@@ -3574,7 +2909,7 @@ haxe.macro.Printer.prototype = {
 				break;
 			case 10:
 				var vl = $e[2];
-				$r = "var " + vl.map($bind($this,$this.printVar)).join(",");
+				$r = "var " + vl.map($bind($this,$this.printVar)).join(", ");
 				break;
 			case 12:
 				var el = $e[2];
@@ -3632,9 +2967,9 @@ haxe.macro.Printer.prototype = {
 					var old = $this.tabs;
 					$this.tabs += $this.tabString;
 					var s = "switch " + $this.printExpr(e1) + " {\n" + $this.tabs + cl.map(function(c) {
-						return "case " + _g.printExprs(c.values,",") + (c.guard != null?"if(" + _g.printExpr(c.guard) + "):":":") + _g.opt(c.expr,$bind(_g,_g.printExpr)) + ";";
+						return "case " + _g.printExprs(c.values,", ") + (c.guard != null?" if(" + _g.printExpr(c.guard) + "): ":":") + (c.expr != null?_g.opt(c.expr,$bind(_g,_g.printExpr)) + ";":"");
 					}).join("\n" + $this.tabs);
-					if(edef != null) s += "\n" + $this.tabs + "default:" + (edef.expr == null?"":$this.printExpr(edef)) + ";";
+					if(edef != null) s += "\n" + $this.tabs + "default: " + (edef.expr == null?"":$this.printExpr(edef)) + ";";
 					$this.tabs = old;
 					$r = s + ("\n" + $this.tabs + "}");
 					return $r;
@@ -3643,7 +2978,7 @@ haxe.macro.Printer.prototype = {
 			case 18:
 				var cl = $e[3], e1 = $e[2];
 				$r = "try " + $this.printExpr(e1) + cl.map(function(c) {
-					return " catch(" + c.name + ":" + _g.printComplexType(c.type) + ") " + _g.printExpr(c.expr);
+					return " catch(" + c.name + " : " + _g.printComplexType(c.type) + ") " + _g.printExpr(c.expr);
 				}).join("");
 				break;
 			case 19:
@@ -3693,16 +3028,16 @@ haxe.macro.Printer.prototype = {
 		}(this));
 	}
 	,printVar: function(v) {
-		return v.name + this.opt(v.type,$bind(this,this.printComplexType),":") + this.opt(v.expr,$bind(this,this.printExpr),"=");
+		return v.name + this.opt(v.type,$bind(this,this.printComplexType)," : ") + this.opt(v.expr,$bind(this,this.printExpr)," = ");
 	}
 	,printFunction: function(func) {
-		return (func.params.length > 0?"<" + func.params.map($bind(this,this.printTypeParamDecl)).join(",") + ">":"") + "(" + func.args.map($bind(this,this.printFunctionArg)).join(",") + ")" + this.opt(func.ret,$bind(this,this.printComplexType),":") + this.opt(func.expr,$bind(this,this.printExpr)," ");
+		return (func.params.length > 0?"<" + func.params.map($bind(this,this.printTypeParamDecl)).join(", ") + ">":"") + "( " + func.args.map($bind(this,this.printFunctionArg)).join(", ") + " )" + this.opt(func.ret,$bind(this,this.printComplexType)," : ") + this.opt(func.expr,$bind(this,this.printExpr)," ");
 	}
 	,printFunctionArg: function(arg) {
-		return (arg.opt?"?":"") + arg.name + this.opt(arg.type,$bind(this,this.printComplexType),":") + this.opt(arg.value,$bind(this,this.printExpr),"=");
+		return (arg.opt?"?":"") + arg.name + this.opt(arg.type,$bind(this,this.printComplexType)," : ") + this.opt(arg.value,$bind(this,this.printExpr)," = ");
 	}
 	,printTypeParamDecl: function(tpd) {
-		return tpd.name + (tpd.params != null && tpd.params.length > 0?"<" + tpd.params.map($bind(this,this.printTypeParamDecl)).join(",") + ">":"") + (tpd.constraints != null && tpd.constraints.length > 0?":(" + tpd.constraints.map($bind(this,this.printComplexType)).join(",") + ")":"");
+		return tpd.name + (tpd.params != null && tpd.params.length > 0?"<" + tpd.params.map($bind(this,this.printTypeParamDecl)).join(", ") + ">":"") + (tpd.constraints != null && tpd.constraints.length > 0?":(" + tpd.constraints.map($bind(this,this.printComplexType)).join(", ") + ")":"");
 	}
 	,printField: function(field) {
 		return (field.doc != null && field.doc != ""?"/**\n" + this.tabs + this.tabString + StringTools.replace(field.doc,"\n","\n" + this.tabs + this.tabString) + "\n" + this.tabs + "**/\n" + this.tabs:"") + (field.meta != null && field.meta.length > 0?field.meta.map($bind(this,this.printMetadata)).join(" ") + " ":"") + (field.access != null && field.access.length > 0?field.access.map($bind(this,this.printAccess)).join(" ") + " ":"") + (function($this) {
@@ -3711,11 +3046,11 @@ haxe.macro.Printer.prototype = {
 			switch( $e[1] ) {
 			case 0:
 				var eo = $e[3], t = $e[2];
-				$r = "var " + field.name + $this.opt(t,$bind($this,$this.printComplexType),":") + $this.opt(eo,$bind($this,$this.printExpr),"=");
+				$r = "var " + field.name + $this.opt(t,$bind($this,$this.printComplexType)," : ") + $this.opt(eo,$bind($this,$this.printExpr)," = ");
 				break;
 			case 2:
 				var eo = $e[5], t = $e[4], set = $e[3], get = $e[2];
-				$r = "var " + field.name + "(" + get + "," + set + ")" + $this.opt(t,$bind($this,$this.printComplexType),":") + $this.opt(eo,$bind($this,$this.printExpr),"=");
+				$r = "var " + field.name + "(" + get + ", " + set + ")" + $this.opt(t,$bind($this,$this.printComplexType)," : ") + $this.opt(eo,$bind($this,$this.printExpr)," = ");
 				break;
 			case 1:
 				var func = $e[2];
@@ -3755,7 +3090,7 @@ haxe.macro.Printer.prototype = {
 		}(this));
 	}
 	,printMetadata: function(meta) {
-		return "@" + meta.name + (meta.params.length > 0?"(" + this.printExprs(meta.params,",") + ")":"");
+		return "@" + meta.name + (meta.params.length > 0?"(" + this.printExprs(meta.params,", ") + ")":"");
 	}
 	,printComplexType: function(ct) {
 		return (function($this) {
@@ -3768,11 +3103,11 @@ haxe.macro.Printer.prototype = {
 				break;
 			case 1:
 				var ret = $e[3], args = $e[2];
-				$r = args.map($bind($this,$this.printComplexType)).join("->") + "->" + $this.printComplexType(ret);
+				$r = args.map($bind($this,$this.printComplexType)).join(" -> ") + " -> " + $this.printComplexType(ret);
 				break;
 			case 2:
 				var fields = $e[2];
-				$r = "{" + ((function($this) {
+				$r = "{ " + ((function($this) {
 					var $r;
 					var _g = [];
 					{
@@ -3780,7 +3115,7 @@ haxe.macro.Printer.prototype = {
 						while(_g1 < fields.length) {
 							var f = fields[_g1];
 							++_g1;
-							_g.push($this.printField(f) + ";");
+							_g.push($this.printField(f) + "; ");
 						}
 					}
 					$r = _g;
@@ -3797,14 +3132,14 @@ haxe.macro.Printer.prototype = {
 				break;
 			case 4:
 				var fields = $e[3], tp = $e[2];
-				$r = "{" + $this.printTypePath(tp) + " >, " + fields.map($bind($this,$this.printField)).join(",") + "}";
+				$r = "{" + $this.printTypePath(tp) + " >, " + fields.map($bind($this,$this.printField)).join(", ") + " }";
 				break;
 			}
 			return $r;
 		}(this));
 	}
 	,printTypePath: function(tp) {
-		return (tp.pack.length > 0?tp.pack.join(".") + ".":"") + tp.name + (tp.sub != null?"." + tp.sub:"") + (tp.params.length > 0?"<" + tp.params.map($bind(this,this.printTypeParam)).join(",") + ">":"");
+		return (tp.pack.length > 0?tp.pack.join(".") + ".":"") + tp.name + (tp.sub != null?"." + tp.sub:"") + (tp.params.length > 0?"<" + tp.params.map($bind(this,this.printTypeParam)).join(", ") + ">":"");
 	}
 	,printTypeParam: function(param) {
 		return (function($this) {
@@ -4842,8 +4177,8 @@ js.Boot.__instanceof = function(o,cl) {
 				if(js.Boot.__interfLoop(o.__class__,cl)) return true;
 			}
 		} else return false;
-		if(cl == Class && o.__name__ != null) return true; else null;
-		if(cl == Enum && o.__ename__ != null) return true; else null;
+		if(cl == Class && o.__name__ != null) return true;
+		if(cl == Enum && o.__ename__ != null) return true;
 		return o.__enum__ == cl;
 	}
 }
@@ -5141,95 +4476,8 @@ xhx.HaxeLexer.__super__ = hxparse.Lexer;
 xhx.HaxeLexer.prototype = $extend(hxparse.Lexer.prototype,{
 	__class__: xhx.HaxeLexer
 });
-var xray = {}
-xray.Client = function() { }
-$hxClasses["xray.Client"] = xray.Client;
-$hxExpose(xray.Client, "client");
-xray.Client.__name__ = ["xray","Client"];
-xray.Client.main = function() {
-	haxe.macro.FieldKind;
-	var http = new haxe.Http("neko.txt");
-	http.onData = xray.Client.parseData;
-	http.request();
-}
-xray.Client.model = null;
-xray.Client.codeModel = null;
-xray.Client.printer = null;
-xray.Client.parseData = function(data) {
-	xray.Client.model = haxe.Unserializer.run(data);
-	xray.Client.codeModel = new dox.Model(Lambda.array(xray.Client.model.types));
-	xray.Client.printer = new dox.Printer(xray.Client.codeModel);
-	var search = js.Browser.document.getElementById("search");
-	search.onkeyup = function(_) {
-		xray.Client.filter(search.value);
-	};
-}
-xray.Client.filter = function(query) {
-	var search = js.Browser.document.getElementById("search");
-	if(search.value != query) search.value = query;
-	query = query.toLowerCase();
-	var results = [];
-	var $it0 = xray.Client.model.types.keys();
-	while( $it0.hasNext() ) {
-		var key = $it0.next();
-		var id = key.toLowerCase();
-		var name = id.split(".").pop();
-		var type = xray.Client.model.types.get(key);
-		if(query == name) {
-			results = [type];
-			break;
-		}
-		if(id.indexOf(query) > -1) results.push(type);
-	}
-	if(results.length > 1) {
-		var chunks = [];
-		xray.Client.currentId = -1;
-		var _g = 0;
-		while(_g < results.length) {
-			var result = results[_g];
-			++_g;
-			var base = xray.TypeTools.baseType(result);
-			if(base != null) {
-				var name = base.pack.concat([base.name]).join(".");
-				chunks.push("<li><a href=\"javascript:client.filter('" + name + "');\">" + name + "</a></li>");
-			}
-		}
-		var output = js.Browser.document.getElementById("results");
-		output.innerHTML = chunks.join("\n");
-	} else {
-		var result = results[0];
-		var pos = dox.TypeTools.toBaseType(result).pos;
-		var id = pos.file;
-		if(id != xray.Client.currentId) {
-			xray.Client.currentId = id;
-			var file = xray.Client.model.files.get(id);
-			var path = file.path;
-			var source = file.source;
-			var output = js.Browser.document.getElementById("results");
-			output.innerHTML = "<pre><code>" + xray.Source.markup(source,path) + "</code></pre>";
-		}
-	}
-}
-xray.Client.currentId = null;
-xray.RefModel = function(t) {
-	this.t = t;
-};
-$hxClasses["xray.RefModel"] = xray.RefModel;
-xray.RefModel.__name__ = ["xray","RefModel"];
-xray.RefModel.of = function(inst) {
-	return new xray.RefModel(inst);
-}
-xray.RefModel.prototype = {
-	toString: function() {
-		return Std.string(this.t);
-	}
-	,get: function() {
-		return this.t;
-	}
-	,t: null
-	,__class__: xray.RefModel
-}
-xray.Source = function(source,file) {
+xhx.HaxeMarkup = function(source,file,exports) {
+	this.exports = exports;
 	this.active = true;
 	this.defines = new haxe.ds.StringMap();
 	this.source = source;
@@ -5238,18 +4486,63 @@ xray.Source = function(source,file) {
 	this.stack = [];
 	var input = new haxe.io.StringInput(source);
 	this.stream = new hxparse.LexerStream(new xhx.HaxeLexer(input,file),xhx.HaxeLexer.tok);
+	this.imports = ["StdTypes"];
+	this.pad = Std.string(source.split("\n").length).length;
 	this.defines.set("neko",true);
 	this.defines.set("sys",true);
+	var parts = HxOverrides.substr(file,1,file.length - 4).split("/");
+	this.module = parts.join(".");
+	this.name = parts.pop();
+	this.pack = parts.join(".");
 };
-$hxClasses["xray.Source"] = xray.Source;
-xray.Source.__name__ = ["xray","Source"];
-xray.Source.markup = function(source,file) {
+$hxClasses["xhx.HaxeMarkup"] = xhx.HaxeMarkup;
+xhx.HaxeMarkup.__name__ = ["xhx","HaxeMarkup"];
+xhx.HaxeMarkup.markup = function(source,file,exports) {
 	if(source == "" || source == null) return "";
-	var parser = new xray.Source(source,file);
-	return parser.parse();
+	var parser = new xhx.HaxeMarkup(source,file,exports);
+	source = parser.parse();
+	return "<code><pre>" + source + "</pre></core>";
 }
-xray.Source.prototype = {
-	parse: function() {
+xhx.HaxeMarkup.punion = function(p1,p2) {
+	return { file : p1.file, min : p1.min < p2.min?p1.min:p2.min, max : p1.max > p2.max?p1.max:p2.max};
+}
+xhx.HaxeMarkup.prototype = {
+	resolveType: function(type) {
+		if(type == this.name) return this.module;
+		if(this.exports.exists(this.module)) {
+			var exported = this.exports.get(this.module);
+			if(Lambda.has(exported,type)) {
+				haxe.Log.trace("Found " + type + " in this module",{ fileName : "HaxeMarkup.hx", lineNumber : 330, className : "xhx.HaxeMarkup", methodName : "resolveType"});
+				return this.module;
+			}
+		}
+		var _g = 0, _g1 = this.imports;
+		while(_g < _g1.length) {
+			var i = _g1[_g];
+			++_g;
+			if(!this.exports.exists(i)) {
+				haxe.Log.trace("No export for import " + i,{ fileName : "HaxeMarkup.hx", lineNumber : 340, className : "xhx.HaxeMarkup", methodName : "resolveType"});
+				return null;
+			}
+			var exported = this.exports.get(i);
+			if(Lambda.has(exported,type)) {
+				haxe.Log.trace("Found " + type + " in " + i,{ fileName : "HaxeMarkup.hx", lineNumber : 347, className : "xhx.HaxeMarkup", methodName : "resolveType"});
+				return i;
+			}
+		}
+		if(this.exports.exists(type)) {
+			haxe.Log.trace("Found " + type + " in top level",{ fileName : "HaxeMarkup.hx", lineNumber : 355, className : "xhx.HaxeMarkup", methodName : "resolveType"});
+			return type;
+		}
+		var name = this.pack + "." + type;
+		if(this.exports.exists(name)) {
+			haxe.Log.trace("Found " + type + " in current package",{ fileName : "HaxeMarkup.hx", lineNumber : 363, className : "xhx.HaxeMarkup", methodName : "resolveType"});
+			return name;
+		}
+		haxe.Log.trace("couldn't find " + type,{ fileName : "HaxeMarkup.hx", lineNumber : 367, className : "xhx.HaxeMarkup", methodName : "resolveType"});
+		return null;
+	}
+	,parse: function() {
 		var token = this.stream.peek();
 		while(token.tok != xhx.TokenDef.Eof) {
 			var $e = (token.tok);
@@ -5273,16 +4566,19 @@ xray.Source.prototype = {
 			case 0:
 				var token_ftok_eKwd_0 = $e[2];
 				switch( (token_ftok_eKwd_0)[1] ) {
-				case 1:
 				case 13:
+					this.add(token,"directive");
+					this.imports.push(this.parseTypeId());
+					break;
+				case 1:
 				case 26:
 				case 40:
 				case 32:
 				case 34:
-					this.add(token,"d");
+					this.add(token,"directive");
 					break;
 				default:
-					this.add(token,"k");
+					this.add(token,"keyword");
 				}
 				break;
 			case 1:
@@ -5293,18 +4589,17 @@ xray.Source.prototype = {
 					var s = $e[2];
 					switch(s) {
 					case "trace":
-						this.add(token,"k");
+						this.add(token,"keyword");
 						break;
 					default:
-						var code = HxOverrides.cca(s,0);
-						if(code > 64 && code < 91) this.add(token,"t"); else this.add(token,"i");
+						if(this.parseTypeId() == null) this.add(token,"identifier");
 					}
 					break;
 				case 2:
-					this.add(token,"s");
+					this.add(token,"string");
 					break;
 				default:
-					this.add(token,"c");
+					this.add(token,"constant");
 				}
 				break;
 			case 7:
@@ -5315,6 +4610,18 @@ xray.Source.prototype = {
 				this.add(token);
 			}
 			token = this.stream.peek();
+		}
+		var pad = 4;
+		var l = 0;
+		var lines = this.buf.b.split("\n");
+		this.buf = new StringBuf();
+		var _g = 0;
+		while(_g < lines.length) {
+			var line = lines[_g];
+			++_g;
+			var num = StringTools.lpad(Std.string(l++)," ",pad);
+			num = "<span class=\"num\">" + num + "</span>";
+			this.buf.b += Std.string(num + " " + line + "\n");
 		}
 		return this.buf.b;
 	}
@@ -5370,6 +4677,48 @@ xray.Source.prototype = {
 			}
 		} catch( e ) { if( e != "__break__" ) throw e; }
 	}
+	,parseTypeId: function() {
+		var tokens = [];
+		var index = 0;
+		var token = this.stream.peek();
+		while(token.tok != xhx.TokenDef.Eof) {
+			tokens.push(token);
+			var $e = (token.tok);
+			switch( $e[1] ) {
+			case 1:
+				var token_ftok_eConst_0 = $e[2];
+				var $e = (token_ftok_eConst_0);
+				switch( $e[1] ) {
+				case 3:
+					var s = $e[2];
+					var code = HxOverrides.cca(s,0);
+					if(code > 64 && code < 91) {
+						var token1 = { pos : xhx.HaxeMarkup.punion(tokens[0].pos,tokens[tokens.length - 1].pos), tok : null};
+						this.add(token1,"type");
+						tokens.pop();
+						var _g = 0;
+						while(_g < tokens.length) {
+							var token2 = tokens[_g];
+							++_g;
+							this.stream.offset++;
+						}
+						return this.src(token1.pos);
+					}
+					break;
+				default:
+					return null;
+				}
+				break;
+			case 10:
+				break;
+			default:
+				return null;
+			}
+			index += 1;
+			token = this.stream.peek(index);
+		}
+		return null;
+	}
 	,parseMacro: function() {
 		var token = this.stream.peek();
 		return (function($this) {
@@ -5387,7 +4736,7 @@ xray.Source.prototype = {
 						$r = (function($this) {
 							var $r;
 							$this.add(token,"macro");
-							$r = $this.defines.exists(s);
+							$r = $this.isDefined(s);
 							return $r;
 						}($this));
 						break;
@@ -5480,13 +4829,30 @@ xray.Source.prototype = {
 			return $r;
 		}(this));
 	}
+	,isDefined: function(flag) {
+		return this.defines.exists(flag);
+	}
 	,add: function(token,span) {
-		if(token.pos.min > this.max) this.buf.b += Std.string(this.source.substring(this.max,token.pos.min));
+		if(token.pos.min > this.max) {
+			var str = this.source.substring(this.max,token.pos.min);
+			this.buf.b += Std.string(str);
+		}
 		this.max = token.pos.max;
 		var str = StringTools.htmlEscape(this.source.substring(token.pos.min,this.max));
-		if(span == null) this.buf.b += Std.string(str); else this.buf.b += Std.string("<span class=\"" + span + "\">" + str + "</span>");
+		if(span == null) this.buf.b += Std.string(str); else if(span == "type") {
+			var module = this.resolveType(str);
+			if(module != null) {
+				var href = "#/" + module.split(".").join("/") + ".hx";
+				this.buf.b += Std.string("<a href=\"" + href + "\"><span class=\"" + span + "\">" + str + "</span></a>");
+			} else this.buf.b += Std.string("<span class=\"" + span + "\">" + str + "</span>");
+		} else this.buf.b += Std.string("<span class=\"" + span + "\">" + str + "</span>");
 		this.stream.offset++;
 	}
+	,name: null
+	,pack: null
+	,module: null
+	,exports: null
+	,pad: null
 	,stack: null
 	,stream: null
 	,buf: null
@@ -5494,17 +4860,173 @@ xray.Source.prototype = {
 	,source: null
 	,defines: null
 	,active: null
-	,__class__: xray.Source
+	,imports: null
+	,src: function(p) {
+		return this.source.substring(p.min,p.max);
+	}
+	,__class__: xhx.HaxeMarkup
+}
+var xray = {}
+xray.Client = function() {
+	this.files = new haxe.ds.StringMap();
+	var window = js.Browser.window;
+	window.addEventListener("hashchange",$bind(this,this.updateLocation));
+	this.output = js.Browser.document.getElementById("results");
+	this.loadSources();
+};
+$hxClasses["xray.Client"] = xray.Client;
+$hxExpose(xray.Client, "client");
+xray.Client.__name__ = ["xray","Client"];
+xray.Client.main = function() {
+	haxe.macro.FieldKind;
+	xray.RefData;
+	new xray.Client();
+}
+xray.Client.prototype = {
+	sourceLoaded: function(data,url) {
+		this.files.set(url,data);
+		this.showSource(url);
+	}
+	,loadSource: function(url) {
+		var http = new haxe.Http("src" + url);
+		http.onData = (function(f,a2) {
+			return function(a1) {
+				return f(a1,a2);
+			};
+		})($bind(this,this.sourceLoaded),url);
+		http.request();
+	}
+	,showSource: function(url) {
+		if(!this.files.exists(url)) {
+			this.loadSource(url);
+			return;
+		}
+		this.output.innerHTML = xhx.HaxeMarkup.markup(this.files.get(url),url,this["export"]);
+	}
+	,showPath: function(url) {
+		var matches = [];
+		var _g = 0, _g1 = this.sources;
+		while(_g < _g1.length) {
+			var source = _g1[_g];
+			++_g;
+			if(StringTools.startsWith(source.local,url)) matches.push(source);
+		}
+		if(matches.length == 0) return;
+		if(matches.length == 1) this.showSource(matches[0].local); else {
+			var items = matches.map(function(source) {
+				return "<a href=\"#" + source.local + "\">" + source.local + "</a>";
+			});
+			this.output.innerHTML = "<pre>" + items.join("\n") + "</pre>";
+		}
+	}
+	,updateLocation: function(_) {
+		var window = js.Browser.window;
+		var path = window.location.pathname;
+		var hash = window.location.hash;
+		var file = HxOverrides.substr(hash,1,null);
+		this.showPath(file);
+	}
+	,parseExport: function(data) {
+		this["export"] = haxe.Unserializer.run(data);
+		this.updateLocation(null);
+	}
+	,loadExport: function() {
+		var http = new haxe.Http("export.txt");
+		http.onData = $bind(this,this.parseExport);
+		http.request();
+	}
+	,parseSources: function(data) {
+		this.sources = haxe.Unserializer.run(data);
+		this.loadExport();
+	}
+	,loadSources: function() {
+		var http = new haxe.Http("source.txt");
+		http.onData = $bind(this,this.parseSources);
+		http.request();
+	}
+	,'export': null
+	,output: null
+	,files: null
+	,sources: null
+	,model: null
+	,__class__: xray.Client
+}
+xray.RefData = function(ref) {
+	this._ref = ref;
+};
+$hxClasses["xray.RefData"] = xray.RefData;
+xray.RefData.__name__ = ["xray","RefData"];
+xray.RefData.of = function(ref) {
+	return new xray.RefData(ref);
+}
+xray.RefData.prototype = {
+	toString: function() {
+		return null;
+	}
+	,get: function() {
+		return this._ref;
+	}
+	,_ref: null
+	,__class__: xray.RefData
+}
+xray.MetaData = function(meta) {
+	this._meta = meta.map(function(m) {
+		return { name : new String(m.name.__s), params : m.params.map(function(e) {
+			return haxe.macro.ExprTools.toString(e);
+		}), pos : null};
+	});
+};
+$hxClasses["xray.MetaData"] = xray.MetaData;
+xray.MetaData.__name__ = ["xray","MetaData"];
+xray.MetaData.prototype = {
+	remove: function(name) {
+		throw "niy";
+	}
+	,add: function(name,params,pos) {
+		throw "niy";
+	}
+	,get: function() {
+		return (function($this) {
+			var $r;
+			throw "niy";
+			return $r;
+		}(this));
+	}
+	,has: function(name) {
+		return Lambda.exists(this._meta,function(m) {
+			return m.name == name;
+		});
+	}
+	,_meta: null
+	,__class__: xray.MetaData
+}
+xray.PathData = function(key) {
+	this._key = key;
+};
+$hxClasses["xray.PathData"] = xray.PathData;
+xray.PathData.__name__ = ["xray","PathData"];
+xray.PathData.prototype = {
+	_key: null
+	,__class__: xray.PathData
+}
+xray.Model = function() {
+	this.type = new haxe.ds.StringMap();
+	this.baseType = new haxe.ds.StringMap();
+	this.file = new haxe.ds.StringMap();
+};
+$hxClasses["xray.Model"] = xray.Model;
+xray.Model.__name__ = ["xray","Model"];
+xray.Model.prototype = {
+	file: null
+	,baseType: null
+	,type: null
+	,__class__: xray.Model
 }
 xray.TypeTools = function() { }
 $hxClasses["xray.TypeTools"] = xray.TypeTools;
 xray.TypeTools.__name__ = ["xray","TypeTools"];
-xray.TypeTools.toString = function(type) {
-	var base = xray.TypeTools.baseType(type);
-	if(base != null) return base.pack.concat([base.name]).join(".");
-	return Std.string(type);
-}
-xray.TypeTools.baseType = function(type) {
+xray.TypeTools.toBaseType = function(type) {
+	if(type == null) return null;
 	return (function($this) {
 		var $r;
 		var $e = (type);
@@ -5525,21 +5047,45 @@ xray.TypeTools.baseType = function(type) {
 			var type_eTAbstract_1 = $e[3], t = $e[2];
 			$r = t.get();
 			break;
+		case 7:
+			var f = $e[2];
+			$r = xray.TypeTools.toBaseType(f());
+			break;
 		default:
 			$r = null;
 		}
 		return $r;
 	}(this));
 }
+xray.TypeTools.isBaseType = function(type) {
+	return xray.TypeTools.toBaseType(type) != null;
+}
+xray.TypeTools.isPublic = function(type) {
+	return !xray.TypeTools.isPrivate(type);
+}
+xray.TypeTools.isPrivate = function(type) {
+	var base = xray.TypeTools.toBaseType(type);
+	return base == null?false:base.isPrivate;
+}
+xray.TypeTools.getPath = function(type) {
+	var base = xray.TypeTools.toBaseType(type);
+	if(base == null) return null;
+	return base.pack.concat([base.name]);
+}
+xray.TypeTools.getName = function(type) {
+	var path = xray.TypeTools.getPath(type);
+	if(path == null) return null;
+	return path.join(".");
+}
 function $iterator(o) { if( o instanceof Array ) return function() { return HxOverrides.iter(o); }; return typeof(o.iterator) == 'function' ? $bind(o,o.iterator) : o.iterator; };
 var $_, $fid = 0;
-function $bind(o,m) { if( m.__id__ == null ) m.__id__ = $fid++; var f; if( o.hx__closures__ == null ) o.hx__closures__ = {}; else f = o.hx__closures__[m.__id__]; if( f == null ) { f = function(){ return f.method.apply(f.scope, arguments); }; f.scope = o; f.method = m; o.hx__closures__[m.__id__] = f; } return f; };
+function $bind(o,m) { if( m == null ) return null; if( m.__id__ == null ) m.__id__ = $fid++; var f; if( o.hx__closures__ == null ) o.hx__closures__ = {}; else f = o.hx__closures__[m.__id__]; if( f == null ) { f = function(){ return f.method.apply(f.scope, arguments); }; f.scope = o; f.method = m; o.hx__closures__[m.__id__] = f; } return f; };
 if(Array.prototype.indexOf) HxOverrides.remove = function(a,o) {
 	var i = a.indexOf(o);
 	if(i == -1) return false;
 	a.splice(i,1);
 	return true;
-}; else null;
+};
 Math.__name__ = ["Math"];
 Math.NaN = Number.NaN;
 Math.NEGATIVE_INFINITY = Number.NEGATIVE_INFINITY;
@@ -5574,7 +5120,7 @@ if(Array.prototype.map == null) Array.prototype.map = function(f) {
 		a[i] = f(this[i]);
 	}
 	return a;
-}; else null;
+};
 if(Array.prototype.filter == null) Array.prototype.filter = function(f) {
 	var a = [];
 	var _g1 = 0, _g = this.length;
@@ -5584,9 +5130,7 @@ if(Array.prototype.filter == null) Array.prototype.filter = function(f) {
 		if(f(e)) a.push(e);
 	}
 	return a;
-}; else null;
-dox.Printer.baseurl = "http://localhost/mdk/doc";
-dox.Printer.out = "doc";
+};
 haxe.Unserializer.DEFAULT_RESOLVER = Type;
 haxe.Unserializer.BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%:";
 haxe.Unserializer.CODES = null;
@@ -6043,6 +5587,14 @@ xhx.HaxeLexer.regexp_options = hxparse.Lexer.build([{ rule : "[gimsu]*", func : 
 		return $r;
 	}(this));
 }}]);
+xhx.HaxeMarkup.DIRECTIVE = "directive";
+xhx.HaxeMarkup.KEYWORD = "keyword";
+xhx.HaxeMarkup.IDENTIFIER = "identifier";
+xhx.HaxeMarkup.STRING = "string";
+xhx.HaxeMarkup.CONSTANT = "constant";
+xhx.HaxeMarkup.COMMENT = "comment";
+xhx.HaxeMarkup.MACRO = "macro";
+xhx.HaxeMarkup.TYPE = "type";
 xray.Client.main();
 function $hxExpose(src, path) {
 	var o = typeof window != "undefined" ? window : exports;

@@ -8,7 +8,7 @@ class Source
 
 	public static function build()
 	{
-		getSources(Macro.std);
+		getSources(Import.std);
 		var data = haxe.Serializer.run(sources);
 		sys.io.File.saveContent("pages/source.txt", data);
 	}

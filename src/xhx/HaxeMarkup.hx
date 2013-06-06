@@ -120,6 +120,7 @@ class HaxeMarkup
 
 	function isDefined(flag:String)
 	{
+		return true;
 		return defines.exists(flag);
 	}
 
@@ -175,7 +176,7 @@ class HaxeMarkup
 			tokens.push(token);
 
 			switch (token.tok)
-			{
+			{	
 				case Const(CIdent(s)):
 					var code = s.charCodeAt(0);
 					if (code > 64 && code < 91)
@@ -186,7 +187,7 @@ class HaxeMarkup
 						for (token in tokens) stream.junk();
 						return src(token.pos);
 					}
-				case Dot:
+				case Kwd(Macro), Dot:
 				case _:
 					return null;
 			}

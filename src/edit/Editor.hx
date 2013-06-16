@@ -1,0 +1,321 @@
+package edit;
+
+import js.html.ImageData;
+import js.html.CanvasElement;
+import js.html.CanvasRenderingContext2D;
+
+/**
+	Todo:
+	double click - select word
+	triple click - select line
+	ctrl+a - select all
+	ctrl+c - copy
+	ctrl+v - paste
+	ctrl+x - cut
+	ctrl+z - undo
+	ctrl+y - redo
+**/
+class Editor
+{
+	var canvas:CanvasElement;
+	var scale:Float;
+	
+	var width:Int;
+	var height:Int;
+
+	var fontSize:Int;
+	var fontCanvas:CanvasElement;
+
+	var charWidth:Int;
+	var charHeight:Int;
+
+	var caret1:Int;
+	var caret2:Int;
+
+	static function main()
+	{
+		new Editor();
+	}
+
+	public function new()
+	{
+		fontSize = 18;
+		caret1 = caret2 = 0;
+
+		// device scale
+		scale = js.Browser.window.devicePixelRatio;
+		var invScale = 1 / scale;
+
+		fontCanvas = js.Browser.document.createCanvasElement();
+		// js.Browser.document.body.appendChild(fontCanvas);
+
+		untyped fontCanvas.style.webkitTransformOrigin = "top left";
+		untyped fontCanvas.style.webkitTransform = 'scale($invScale,$invScale)';
+
+		generateFont();
+
+		canvas = js.Browser.document.createCanvasElement();
+		js.Browser.document.body.appendChild(canvas);
+
+		untyped canvas.style.webkitTransformOrigin = "top left";
+		untyped canvas.style.webkitTransform = 'scale($invScale,$invScale)';
+
+		canvas.width = Std.int(js.Browser.window.innerWidth * scale);
+		canvas.height = Std.int(js.Browser.window.innerHeight * scale);
+
+		js.Browser.document.body.addEventListener("keypress", keyPress);
+		js.Browser.document.body.addEventListener("keydown", keyDown);
+		js.Browser.document.body.addEventListener("keyup", keyUp);
+		js.Browser.document.body.addEventListener("mousedown", mouseDown);
+		js.Browser.document.body.addEventListener("mouseup", mouseUp);
+
+		content = "Hello World!\n\nSome more interesting text goes here. Maybe some Lorem ipsum?\nWho knows.";
+		render();
+	}
+
+	var content = "";
+
+	function inputChar(code:Int)
+	{
+		var region = new Region(caret1, caret2);
+
+		switch (code)
+		{
+			case 8: // backspace
+				if (region.end - region.begin > 0)
+				{
+					content = content.substr(0, region.begin) + content.substr(region.end);
+					caret1 = region.begin;
+				}
+				else
+				{
+					if (caret1 == 0) return;
+					content = content.substr(0, region.begin - 1) + content.substr(region.end);
+					caret1 --;
+				}
+				caret2 = caret1;
+				render();
+				return;
+
+			case _:
+				caret1 = region.begin + 1;
+		}
+
+		var char = String.fromCharCode(code);
+		content = content.substr(0, region.begin) + char + content.substr(region.end);
+
+		caret2 = caret1;
+		render();
+	}
+
+	function getPosition(index:Int):{col:Int, row:Int}
+	{
+		var lines = content.split("\n");
+		for (i in 0...lines.length)
+		{
+			index -= lines[i].length + 1;
+			if (index < 0) return {col:lines[i].length+index+1, row:i};
+		}
+		return null;
+	}
+
+	function getIndex(col:Int, row:Int):Int
+	{
+		if (row < 0) return 0;
+
+		var index = 0;
+		var lines = content.split("\n");
+
+		if (row > lines.length - 1) return content.length;
+
+		for (i in 0...lines.length)
+		{
+			var line = lines[i];
+			if (i == row)
+			{
+				if (col > line.length) col = line.length;
+				return index + col;
+			}
+			else index += line.length + 1;
+		}
+		return index;
+	}
+
+	function keyPress(e)
+	{
+		var code = e.keyCode;
+		if (code == 13) code  = 10;
+		inputChar(code);
+	}
+
+	var shift:Bool;
+	var ctrl:Bool;
+	var alt:Bool;
+
+	function keyDown(e)
+	{
+		var region = new Region(caret1, caret2);
+
+		// trace(e.keyCode);
+		switch (e.keyCode)
+		{
+			case 16: shift = true;
+			case 17: ctrl = true;
+			case 18: alt = true;
+
+			case 9, 8: // tab, backspace
+				e.preventDefault();
+				inputChar(e.keyCode);
+
+			case 37,39: // left, right
+				var delta = e.keyCode == 37 ? -1 : 1;
+				
+				if (alt) caret1 = wordBoundary(caret1, delta);
+				else
+				{
+					if (region.isEmpty())
+					{
+						caret1 = caret1 + delta;
+					}
+					else
+					{
+						caret1 = delta > 0 ? region.end : region.begin;
+					}
+				}
+				
+				if (caret1 < 0) caret1 = 0;
+				else if (caret1 > content.length) caret1 = content.length;
+				if (!shift) caret2 = caret1;
+				render();
+
+			case 38,40: // up, down
+				var pos = getPosition(caret1);
+				var delta = e.keyCode == 38 ? -1 : 1;
+				caret1 = getIndex(pos.col, pos.row + delta);
+				if (!shift) caret2 = caret1;
+				render();
+
+			case _:
+		}
+	}
+	
+	function wordBoundary(index:Int, delta:Int)
+	{
+		var wordChars = " \n./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?";
+		index += delta;
+		if (delta == -1) index += delta;
+		while (index > -1 && index < content.length - 1)
+		{
+			if (wordChars.indexOf(content.charAt(index)) > -1) break;
+			index += delta;
+		}
+		if (delta == -1) index += 1;
+		return index;
+	}
+
+	function keyUp(e)
+	{
+		switch (e.keyCode)
+		{
+			case 16: shift = false;
+			case 17: ctrl = false;
+			case 18: alt = false;
+			case _:
+		}
+	}
+	function mouseDown(e)
+	{
+		var col = Math.round((e.clientX * scale) / charWidth);
+		var row = Math.floor((e.clientY * scale) / charHeight);
+		caret1 = caret2 = getIndex(col, row);
+		render();
+
+		js.Browser.document.body.addEventListener("mousemove", mouseMove);
+	}
+
+	function mouseMove(e)
+	{
+		var col = Math.round((e.clientX * scale) / charWidth);
+		var row = Math.floor((e.clientY * scale) / charHeight);
+		
+		caret1 = getIndex(col, row);
+		render();
+	}
+
+	function mouseUp(e)
+	{
+		js.Browser.document.body.removeEventListener("mousemove", mouseMove);
+	}
+	
+	function render()
+	{
+		var context = canvas.getContext2d();
+		context.clearRect(0, 0, canvas.width, canvas.height);
+
+		var region = new Region(caret1, caret2);
+		var x = 0;
+		var y = 0;
+		
+		for (i in 0...content.length + 1)
+		{
+			var code = content.charCodeAt(i);
+			var w = 1;
+			if (code == 9) w = (Math.floor(x/4)*4+4) - x;
+
+			if (!region.isEmpty() && i >= region.begin && i < region.end)
+			{
+				context.fillStyle = "orange";
+				context.fillRect(x * charWidth, y * charHeight, charWidth * w, charHeight);
+			}
+
+			if (code != 10 && code != 9)
+			{
+				context.drawImage(fontCanvas, 
+					code * charWidth, 0, charWidth, charHeight,
+					x * charWidth, y * charHeight, charWidth, charHeight);
+			}
+
+			if (i == caret1)
+			{
+				context.fillStyle = "white";
+				context.fillRect(x * charWidth, y * charHeight, 2, charHeight);
+			}
+
+			if (code == 10)
+			{
+				x = 0;
+				y ++;
+			}
+			else
+			{
+				x += w;
+			}
+		}
+	}
+
+	function generateFont()
+	{
+		var context = fontCanvas.getContext2d();
+		context.font = '${fontSize}px Consolas';
+
+		var nativeWidth = Math.ceil(context.measureText("X").width) + 1;
+		charWidth = Math.ceil(nativeWidth * scale);
+		charHeight = Math.ceil(fontSize * scale * 1.2);
+
+		var totalWidth = 127 * charWidth;
+		fontCanvas.width = totalWidth;
+		fontCanvas.height = charHeight;
+
+		context.scale(scale, scale);
+		context.clearRect(0, 0, totalWidth, charHeight);
+
+		context.fillStyle = "white";
+		context.textBaseline = "top";
+		context.font = '${fontSize}px monospace';
+
+		for (i in 0...127)
+		{
+			context.fillText(String.fromCharCode(i), i * nativeWidth, 0);
+		}
+	}
+}

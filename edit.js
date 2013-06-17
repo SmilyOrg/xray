@@ -31,11 +31,15 @@ edit.Editor = function() {
 	this.canvas.style.webkitTransform = "scale(" + invScale + "," + invScale + ")";
 	this.canvas.width = js.Browser.window.innerWidth * this.scale | 0;
 	this.canvas.height = js.Browser.window.innerHeight * this.scale | 0;
-	js.Browser.document.body.addEventListener("keypress",$bind(this,this.keyPress));
-	js.Browser.document.body.addEventListener("keydown",$bind(this,this.keyDown));
-	js.Browser.document.body.addEventListener("keyup",$bind(this,this.keyUp));
-	js.Browser.document.body.addEventListener("mousedown",$bind(this,this.mouseDown));
-	js.Browser.document.body.addEventListener("mouseup",$bind(this,this.mouseUp));
+	var body = js.Browser.document.body;
+	body.addEventListener("keypress",$bind(this,this.keyPress));
+	body.addEventListener("keydown",$bind(this,this.keyDown));
+	body.addEventListener("keyup",$bind(this,this.keyUp));
+	body.addEventListener("mousedown",$bind(this,this.mouseDown));
+	body.addEventListener("mouseup",$bind(this,this.mouseUp));
+	js.Browser.document.addEventListener("paste",$bind(this,this.paste));
+	js.Browser.document.addEventListener("copy",$bind(this,this.copy));
+	js.Browser.document.addEventListener("cut",$bind(this,this.cut));
 	this.content = "Hello World!\n\nSome more interesting text goes here. Maybe some Lorem ipsum?\nWho knows.";
 	this.render();
 };
@@ -117,6 +121,9 @@ edit.Editor.prototype = {
 		case 18:
 			this.alt = false;
 			break;
+		case 91:
+			this.cmd = false;
+			break;
 		default:
 		}
 	}
@@ -133,6 +140,7 @@ edit.Editor.prototype = {
 	}
 	,keyDown: function(e) {
 		var region = new edit.Region(this.caret1,this.caret2);
+		console.log(e.keyCode);
 		switch(e.keyCode) {
 		case 16:
 			this.shift = true;
@@ -143,26 +151,50 @@ edit.Editor.prototype = {
 		case 18:
 			this.alt = true;
 			break;
+		case 91:
+			this.cmd = true;
+			break;
+		case 35:
+			this.setCaret(this.content.length);
+			break;
+		case 36:
+			this.setCaret(0);
+			break;
 		case 9:case 8:
 			e.preventDefault();
 			this.inputChar(e.keyCode);
 			break;
 		case 37:case 39:
 			var delta = e.keyCode == 37?-1:1;
-			if(this.alt) this.caret1 = this.wordBoundary(this.caret1,delta); else if(region.isEmpty()) this.caret1 = this.caret1 + delta; else this.caret1 = delta > 0?region.end:region.begin;
+			if(this.alt) this.caret1 = this.wordBoundary(this.caret1,delta); else if(region.isEmpty() || this.shift) this.caret1 = this.caret1 + delta; else this.caret1 = delta > 0?region.end:region.begin;
 			if(this.caret1 < 0) this.caret1 = 0; else if(this.caret1 > this.content.length) this.caret1 = this.content.length;
 			if(!this.shift) this.caret2 = this.caret1;
 			this.render();
 			break;
 		case 38:case 40:
-			var pos = this.getPosition(this.caret1);
+			if(this.cmd) {
+				this.setCaret(e.keyCode == 38?0:this.content.length);
+				return;
+			}
 			var delta = e.keyCode == 38?-1:1;
-			this.caret1 = this.getIndex(pos.col,pos.row + delta);
+			if(region.isEmpty() || this.shift) {
+				var pos = this.getPosition(this.caret1);
+				this.caret1 = this.getIndex(pos.col,pos.row + delta);
+			} else {
+				var pos = this.getPosition(delta > 0?region.end:region.begin);
+				this.caret1 = this.getIndex(pos.col,pos.row + delta);
+			}
 			if(!this.shift) this.caret2 = this.caret1;
 			this.render();
 			break;
 		default:
 		}
+	}
+	,setCaret: function(index) {
+		if(index < 0) index = 0; else if(index > this.content.length) index = this.content.length;
+		this.caret1 = index;
+		if(!this.shift) this.caret2 = this.caret1;
+		this.render();
 	}
 	,keyPress: function(e) {
 		var code = e.keyCode;
@@ -217,6 +249,24 @@ edit.Editor.prototype = {
 		this.content = HxOverrides.substr(this.content,0,region.begin) + $char + HxOverrides.substr(this.content,region.end,null);
 		this.caret2 = this.caret1;
 		this.render();
+	}
+	,insertText: function(text) {
+		var region = new edit.Region(this.caret1,this.caret2);
+		this.content = HxOverrides.substr(this.content,0,region.begin) + text + HxOverrides.substr(this.content,region.end,null);
+		this.caret2 = this.caret1;
+		this.render();
+	}
+	,paste: function(e) {
+		console.log("paste");
+		this.insertText(e.clipboardData.getData("Text"));
+	}
+	,copy: function(e) {
+		console.log("copy");
+		console.log(e);
+	}
+	,cut: function(e) {
+		console.log("cut");
+		console.log(e);
 	}
 }
 edit.Region = function(a,b) {

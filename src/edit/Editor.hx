@@ -27,7 +27,7 @@ class Editor
 	var cmd:Bool;
 
 	var content = "";
-	var gutterWidth = 3;
+	var gutterWidth = 30;
 
 	static function main()
 	{
@@ -167,6 +167,7 @@ class Editor
 			if (i == row)
 			{
 				if (col > line.length) col = line.length;
+				if (col < 0) col = 0;
 				return index + col;
 			}
 			else index += line.length + 1;
@@ -289,12 +290,32 @@ class Editor
 		}
 	}
 
+	// TODO: yuck.
 	function layoutToText(x:Float, y:Float):Int
 	{
-		x -= gutterWidth * charWidth;
-		var col = Math.round((x * scale) / charWidth);
+		x -= gutterWidth * (1 / scale);
 		var row = Math.floor((y * scale) / charHeight);
-		return getIndex(col, row);
+		var col = (x * scale) / charWidth;
+
+		var line = getLine(row);
+		var charCol = 0;
+		var charX = 0;
+		for (i in 0...line.length)
+		{
+			var code = line.charCodeAt(i);
+			var w = 1;
+			if (code == 9) w = (Math.floor(charX/4)*4+4) - charX;
+			if (charX + w / 2 >= col) break;
+			charCol += 1;
+			charX += w;
+		}
+		
+		return getIndex(charCol, row);
+	}
+
+	function getLine(index:Int)
+	{
+		return content.split("\n")[index];
 	}
 
 	function mouseDown(e)
@@ -322,7 +343,7 @@ class Editor
 		context.clearRect(0, 0, canvas.width, canvas.height);
 
 		var region = new Region(caret1, caret2);
-		var x = gutterWidth;
+		var x = 0;
 		var y = 0;
 		
 		for (i in 0...content.length + 1)
@@ -334,25 +355,25 @@ class Editor
 			if (!region.isEmpty() && i >= region.begin && i < region.end)
 			{
 				context.fillStyle = "orange";
-				context.fillRect(x * charWidth, y * charHeight, charWidth * w, charHeight);
+				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
 			}
 
 			if (code != 10 && code != 9)
 			{
 				context.drawImage(fontCanvas, 
 					code * charWidth, 0, charWidth, charHeight,
-					x * charWidth, y * charHeight, charWidth, charHeight);
+					gutterWidth + x * charWidth, y * charHeight, charWidth, charHeight);
 			}
 
 			if (i == caret1)
 			{
 				context.fillStyle = "white";
-				context.fillRect(x * charWidth, y * charHeight, 2, charHeight);
+				context.fillRect(gutterWidth + x * charWidth, y * charHeight, 2, charHeight);
 			}
 
 			if (code == 10)
 			{
-				x = gutterWidth;
+				x = 0;
 				y ++;
 			}
 			else

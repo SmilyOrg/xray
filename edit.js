@@ -16,8 +16,9 @@ HxOverrides.substr = function(s,pos,len) {
 }
 var edit = {}
 edit.Editor = function() {
+	this.gutterWidth = 3;
 	this.content = "";
-	this.fontSize = 18;
+	this.fontSize = 14;
 	this.caret1 = this.caret2 = 0;
 	this.scale = js.Browser.window.devicePixelRatio;
 	var invScale = 1 / this.scale;
@@ -40,7 +41,7 @@ edit.Editor = function() {
 	js.Browser.document.addEventListener("paste",$bind(this,this.paste));
 	js.Browser.document.addEventListener("copy",$bind(this,this.copy));
 	js.Browser.document.addEventListener("cut",$bind(this,this.cut));
-	this.content = "Hello World!\n\nSome more interesting text goes here. Maybe some Lorem ipsum?\nWho knows.";
+	this.content = edit.Editor.lorem;
 	this.render();
 };
 edit.Editor.main = function() {
@@ -71,7 +72,7 @@ edit.Editor.prototype = {
 		var context = this.canvas.getContext("2d");
 		context.clearRect(0,0,this.canvas.width,this.canvas.height);
 		var region = new edit.Region(this.caret1,this.caret2);
-		var x = 0;
+		var x = this.gutterWidth;
 		var y = 0;
 		var _g1 = 0, _g = this.content.length + 1;
 		while(_g1 < _g) {
@@ -89,7 +90,7 @@ edit.Editor.prototype = {
 				context.fillRect(x * this.charWidth,y * this.charHeight,2,this.charHeight);
 			}
 			if(code == 10) {
-				x = 0;
+				x = this.gutterWidth;
 				y++;
 			} else x += w;
 		}
@@ -98,17 +99,19 @@ edit.Editor.prototype = {
 		js.Browser.document.body.removeEventListener("mousemove",$bind(this,this.mouseMove));
 	}
 	,mouseMove: function(e) {
-		var col = Math.round(e.clientX * this.scale / this.charWidth);
-		var row = Math.floor(e.clientY * this.scale / this.charHeight);
-		this.caret1 = this.getIndex(col,row);
+		this.caret1 = this.layoutToText(e.clientX,e.clientY);
 		this.render();
 	}
 	,mouseDown: function(e) {
-		var col = Math.round(e.clientX * this.scale / this.charWidth);
-		var row = Math.floor(e.clientY * this.scale / this.charHeight);
-		this.caret1 = this.caret2 = this.getIndex(col,row);
+		this.caret1 = this.caret2 = this.layoutToText(e.clientX,e.clientY);
 		this.render();
 		js.Browser.document.body.addEventListener("mousemove",$bind(this,this.mouseMove));
+	}
+	,layoutToText: function(x,y) {
+		x -= this.gutterWidth * this.charWidth;
+		var col = Math.round(x * this.scale / this.charWidth);
+		var row = Math.floor(y * this.scale / this.charHeight);
+		return this.getIndex(col,row);
 	}
 	,keyUp: function(e) {
 		switch(e.keyCode) {
@@ -160,13 +163,16 @@ edit.Editor.prototype = {
 		case 36:
 			this.setCaret(0);
 			break;
-		case 9:case 8:
+		case 190:
+			this.inputChar(190);
+			break;
+		case 9:case 8:case 46:
 			e.preventDefault();
 			this.inputChar(e.keyCode);
 			break;
 		case 37:case 39:
 			var delta = e.keyCode == 37?-1:1;
-			if(this.alt) this.caret1 = this.wordBoundary(this.caret1,delta); else if(region.isEmpty() || this.shift) this.caret1 = this.caret1 + delta; else this.caret1 = delta > 0?region.end:region.begin;
+			if(this.alt) this.caret1 = this.wordBoundary(this.caret1,delta); else if(region.isEmpty() || this.shift) this.caret1 = this.caret1 + delta; else if(delta > 0) this.caret1 = region.end; else this.caret1 = region.begin;
 			if(this.caret1 < 0) this.caret1 = 0; else if(this.caret1 > this.content.length) this.caret1 = this.content.length;
 			if(!this.shift) this.caret2 = this.caret1;
 			this.render();
@@ -190,16 +196,17 @@ edit.Editor.prototype = {
 		default:
 		}
 	}
+	,keyPress: function(e) {
+		var code = e.keyCode;
+		if(code == 46) return;
+		if(code == 13) code = 10;
+		this.inputChar(code);
+	}
 	,setCaret: function(index) {
 		if(index < 0) index = 0; else if(index > this.content.length) index = this.content.length;
 		this.caret1 = index;
 		if(!this.shift) this.caret2 = this.caret1;
 		this.render();
-	}
-	,keyPress: function(e) {
-		var code = e.keyCode;
-		if(code == 13) code = 10;
-		this.inputChar(code);
 	}
 	,getIndex: function(col,row) {
 		if(row < 0) return 0;
@@ -228,24 +235,23 @@ edit.Editor.prototype = {
 		return null;
 	}
 	,inputChar: function(code) {
+		var $char = String.fromCharCode(code == 190?46:code);
 		var region = new edit.Region(this.caret1,this.caret2);
+		console.log(code);
 		switch(code) {
-		case 8:
-			if(region.end - region.begin > 0) {
-				this.content = HxOverrides.substr(this.content,0,region.begin) + HxOverrides.substr(this.content,region.end,null);
-				this.caret1 = region.begin;
-			} else {
-				if(this.caret1 == 0) return;
-				this.content = HxOverrides.substr(this.content,0,region.begin - 1) + HxOverrides.substr(this.content,region.end,null);
-				this.caret1--;
-			}
-			this.caret2 = this.caret1;
-			this.render();
-			return;
+		case 8:case 46:
+			$char = "";
+			if(region.isEmpty()) {
+				if(code == 8) {
+					if(this.caret1 == 0) return;
+					this.caret1--;
+					region = new edit.Region(this.caret1,this.caret2);
+				} else region = new edit.Region(this.caret1,this.caret2 + 1);
+			} else this.caret1 = region.begin;
+			break;
 		default:
 			this.caret1 = region.begin + 1;
 		}
-		var $char = String.fromCharCode(code);
 		this.content = HxOverrides.substr(this.content,0,region.begin) + $char + HxOverrides.substr(this.content,region.end,null);
 		this.caret2 = this.caret1;
 		this.render();
@@ -253,20 +259,22 @@ edit.Editor.prototype = {
 	,insertText: function(text) {
 		var region = new edit.Region(this.caret1,this.caret2);
 		this.content = HxOverrides.substr(this.content,0,region.begin) + text + HxOverrides.substr(this.content,region.end,null);
-		this.caret2 = this.caret1;
+		this.caret1 = this.caret2 = region.begin + text.length;
 		this.render();
 	}
 	,paste: function(e) {
-		console.log("paste");
-		this.insertText(e.clipboardData.getData("Text"));
+		this.insertText(e.clipboardData.getData("text/plain"));
 	}
 	,copy: function(e) {
-		console.log("copy");
-		console.log(e);
+		var region = new edit.Region(this.caret1,this.caret2);
+		e.preventDefault();
+		e.clipboardData.setData("text/plain",this.content.substring(region.begin,region.end));
 	}
 	,cut: function(e) {
-		console.log("cut");
-		console.log(e);
+		var region = new edit.Region(this.caret1,this.caret2);
+		e.preventDefault();
+		e.clipboardData.setData("text/plain",this.content.substring(region.begin,region.end));
+		this.insertText("");
 	}
 }
 edit.Region = function(a,b) {
@@ -315,6 +323,7 @@ Math.isFinite = function(i) {
 Math.isNaN = function(i) {
 	return isNaN(i);
 };
+edit.Editor.lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed sed purus tempus, \nfacilisis dui id, egestas magna.\n\nCurabitur sagittis, libero quis adipiscing consectetur, odio risus mattis \ntristique ante nec faucibus dictum. Nulla sapien lectus, pellentesque et mattis \na, rutrum quis massa. Ut eget nulla neque. Donec vitae mi mauris. Fusce dolor \nfelis, viverra eget dolor at, luctus dignissim nisl. Etiam eu libero \nscelerisque metus volutpat pulvinar accumsan nec neque.\n\nVestibulum ante ipsum primis in faucibus orci luctus.\n\nSuspendisse euismod posuere mi, ac pretium eros. In in metus pulvinar, \nelementum nibh eget, congue massa. Vestibulum eros elit, pellentesque at massa \nsed, rhoncus laoreet purus. Proin interdum mauris sed enim posuere \npellentesque. Maecenas facilisis blandit hendrerit. Pellentesque ut velit \neleifend, commodo nisl vitae, vehicula orci. Suspendisse pellentesque auctor \norci in pretium.\n\nVestibulum accumsan malesuada ante, ut suscipit neque rhoncus vitae. Nunc \nsagittis tincidunt ligula, sit amet ultricies nibh eleifend vitae. Nullam vel \nbibendum ipsum. Vestibulum in nisl bibendum, ultricies augue a, ullamcorper \nsem. Mauris euismod urna eros, a placerat leo tincidunt sed. Vestibulum luctus \nmetus ut vestibulum congue. Sed rutrum aliquet metus, at gravida nunc volutpat \nmattis. Praesent congue nisl quis augue euismod, quis dignissim diam mattis. \nMorbi malesuada blandit nulla sit amet ultrices. Pellentesque vitae ornare dui, \nvel euismod velit. Ut quam erat, congue id tellus vel, pharetra laoreet tortor. \nProin feugiat, enim et pulvinar ornare, lorem erat consequat urna, vel \nsollicitudin libero erat vitae tellus.";
 js.Browser.window = typeof window != "undefined" ? window : null;
 js.Browser.document = typeof window != "undefined" ? window.document : null;
 edit.Editor.main();

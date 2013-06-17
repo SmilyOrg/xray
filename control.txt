@@ -1,0 +1,22 @@
+left, right, up, down	move
+alt-left, alt-right		move to word boundary
+cmd-up, home			move to start
+cmd-down, end			move to end
+shift-move				select to move position
+ctrl-x					cut
+ctrl-c					copy
+ctrl-v					paste
+backspace				delete previous char
+delete					delete next char
+
+Todo:
+
+ctrl-z					undo
+ctrl-y					redo
+ctrl-a					select all
+
+double click - select word
+triple click - select line
+
+cmd-left				move to first non-whitespace char on line
+cmd-right				move to end of line

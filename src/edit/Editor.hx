@@ -32,6 +32,13 @@ class Editor
 	var caret1:Int;
 	var caret2:Int;
 
+	var shift:Bool;
+	var ctrl:Bool;
+	var alt:Bool;
+	var cmd:Bool;
+
+	var content = "";
+
 	static function main()
 	{
 		new Editor();
@@ -63,17 +70,46 @@ class Editor
 		canvas.width = Std.int(js.Browser.window.innerWidth * scale);
 		canvas.height = Std.int(js.Browser.window.innerHeight * scale);
 
-		js.Browser.document.body.addEventListener("keypress", keyPress);
-		js.Browser.document.body.addEventListener("keydown", keyDown);
-		js.Browser.document.body.addEventListener("keyup", keyUp);
-		js.Browser.document.body.addEventListener("mousedown", mouseDown);
-		js.Browser.document.body.addEventListener("mouseup", mouseUp);
+		var body = js.Browser.document.body;
+		body.addEventListener("keypress", keyPress);
+		body.addEventListener("keydown", keyDown);
+		body.addEventListener("keyup", keyUp);
+		body.addEventListener("mousedown", mouseDown);
+		body.addEventListener("mouseup", mouseUp);
+
+		js.Browser.document.addEventListener("paste", paste);
+		js.Browser.document.addEventListener("copy", copy);
+		js.Browser.document.addEventListener("cut", cut);
 
 		content = "Hello World!\n\nSome more interesting text goes here. Maybe some Lorem ipsum?\nWho knows.";
 		render();
 	}
 
-	var content = "";
+	function cut(e)
+	{
+		trace("cut");
+		trace(e);
+	}
+
+	function copy(e)
+	{
+		trace("copy");
+		trace(e);
+	}
+
+	function paste(e)
+	{
+		trace("paste");
+		insertText(e.clipboardData.getData("Text"));
+	}
+
+	function insertText(text:String)
+	{
+		var region = new Region(caret1, caret2);
+		content = content.substr(0, region.begin) + text + content.substr(region.end);
+		caret2 = caret1;
+		render();
+	}
 
 	function inputChar(code:Int)
 	{
@@ -148,20 +184,31 @@ class Editor
 		inputChar(code);
 	}
 
-	var shift:Bool;
-	var ctrl:Bool;
-	var alt:Bool;
+	function setCaret(index:Int)
+	{
+		// check bounds
+		if (index < 0) index = 0;
+		else if (index > content.length) index = content.length;
+
+		caret1 = index;
+		if (!shift) caret2 = caret1;
+		render();
+	}
 
 	function keyDown(e)
 	{
 		var region = new Region(caret1, caret2);
 
-		// trace(e.keyCode);
+		trace(e.keyCode);
 		switch (e.keyCode)
 		{
 			case 16: shift = true;
 			case 17: ctrl = true;
 			case 18: alt = true;
+			case 91: cmd = true;
+
+			case 35: setCaret(content.length); // end
+			case 36: setCaret(0); // home
 
 			case 9, 8: // tab, backspace
 				e.preventDefault();
@@ -170,10 +217,13 @@ class Editor
 			case 37,39: // left, right
 				var delta = e.keyCode == 37 ? -1 : 1;
 				
-				if (alt) caret1 = wordBoundary(caret1, delta);
+				if (alt)
+				{
+					caret1 = wordBoundary(caret1, delta);
+				}
 				else
 				{
-					if (region.isEmpty())
+					if (region.isEmpty() || shift)
 					{
 						caret1 = caret1 + delta;
 					}
@@ -189,9 +239,23 @@ class Editor
 				render();
 
 			case 38,40: // up, down
-				var pos = getPosition(caret1);
+				if (cmd)
+				{
+					setCaret(e.keyCode == 38 ? 0 : content.length);
+					return;
+				}
+
 				var delta = e.keyCode == 38 ? -1 : 1;
-				caret1 = getIndex(pos.col, pos.row + delta);
+				if (region.isEmpty() || shift)
+				{
+					var pos = getPosition(caret1);
+					caret1 = getIndex(pos.col, pos.row + delta);
+				}
+				else
+				{
+					var pos = getPosition(delta > 0 ? region.end : region.begin);
+					caret1 = getIndex(pos.col, pos.row + delta);
+				}
 				if (!shift) caret2 = caret1;
 				render();
 
@@ -220,6 +284,7 @@ class Editor
 			case 16: shift = false;
 			case 17: ctrl = false;
 			case 18: alt = false;
+			case 91: cmd = false;
 			case _:
 		}
 	}

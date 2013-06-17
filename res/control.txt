@@ -1,0 +1,5 @@
+left, right, up, down	move
+alt-left, alt-right		move to word boundary
+cmd-up, home			move to start
+cmd-down, end			move to end
+shift-move				select to move position

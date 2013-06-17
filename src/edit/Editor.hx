@@ -4,17 +4,6 @@ import js.html.ImageData;
 import js.html.CanvasElement;
 import js.html.CanvasRenderingContext2D;
 
-/**
-	Todo:
-	double click - select word
-	triple click - select line
-	ctrl+a - select all
-	ctrl+c - copy
-	ctrl+v - paste
-	ctrl+x - cut
-	ctrl+z - undo
-	ctrl+y - redo
-**/
 class Editor
 {
 	var canvas:CanvasElement;
@@ -38,6 +27,7 @@ class Editor
 	var cmd:Bool;
 
 	var content = "";
+	var gutterWidth = 3;
 
 	static function main()
 	{
@@ -46,7 +36,7 @@ class Editor
 
 	public function new()
 	{
-		fontSize = 18;
+		fontSize = 14;
 		caret1 = caret2 = 0;
 
 		// device scale
@@ -81,63 +71,70 @@ class Editor
 		js.Browser.document.addEventListener("copy", copy);
 		js.Browser.document.addEventListener("cut", cut);
 
-		content = "Hello World!\n\nSome more interesting text goes here. Maybe some Lorem ipsum?\nWho knows.";
+		content = lorem;
 		render();
 	}
 
 	function cut(e)
 	{
-		trace("cut");
-		trace(e);
+		var region = new Region(caret1, caret2);
+		e.preventDefault();
+		e.clipboardData.setData("text/plain", content.substring(region.begin, region.end));
+		insertText("");
 	}
 
 	function copy(e)
 	{
-		trace("copy");
-		trace(e);
+		var region = new Region(caret1, caret2);
+		e.preventDefault();
+		e.clipboardData.setData("text/plain", content.substring(region.begin, region.end));
 	}
 
 	function paste(e)
 	{
-		trace("paste");
-		insertText(e.clipboardData.getData("Text"));
+		insertText(e.clipboardData.getData("text/plain"));
 	}
 
 	function insertText(text:String)
 	{
 		var region = new Region(caret1, caret2);
 		content = content.substr(0, region.begin) + text + content.substr(region.end);
-		caret2 = caret1;
+		caret1 = caret2 = region.begin + text.length;
 		render();
 	}
 
 	function inputChar(code:Int)
 	{
+		var char = String.fromCharCode(code == 190 ? 46 : code);
 		var region = new Region(caret1, caret2);
-
+		trace(code);
 		switch (code)
 		{
-			case 8: // backspace
-				if (region.end - region.begin > 0)
+			case 8, 46: // backspace, delete
+				char = "";
+
+				if (region.isEmpty())
 				{
-					content = content.substr(0, region.begin) + content.substr(region.end);
-					caret1 = region.begin;
+					if (code == 8)
+					{
+						if (caret1 == 0) return;
+						caret1 --;
+						region = new Region(caret1, caret2);
+					}
+					else
+					{
+						region = new Region(caret1, caret2 + 1);
+					}
 				}
 				else
 				{
-					if (caret1 == 0) return;
-					content = content.substr(0, region.begin - 1) + content.substr(region.end);
-					caret1 --;
+					caret1 = region.begin;
 				}
-				caret2 = caret1;
-				render();
-				return;
 
 			case _:
 				caret1 = region.begin + 1;
 		}
 
-		var char = String.fromCharCode(code);
 		content = content.substr(0, region.begin) + char + content.substr(region.end);
 
 		caret2 = caret1;
@@ -177,13 +174,6 @@ class Editor
 		return index;
 	}
 
-	function keyPress(e)
-	{
-		var code = e.keyCode;
-		if (code == 13) code  = 10;
-		inputChar(code);
-	}
-
 	function setCaret(index:Int)
 	{
 		// check bounds
@@ -195,10 +185,18 @@ class Editor
 		render();
 	}
 
+	function keyPress(e)
+	{
+		var code = e.keyCode;
+		if (code == 46) return;
+		if (code == 13) code  = 10;
+		inputChar(code);
+	}
+
 	function keyDown(e)
 	{
 		var region = new Region(caret1, caret2);
-
+		
 		trace(e.keyCode);
 		switch (e.keyCode)
 		{
@@ -210,7 +208,9 @@ class Editor
 			case 35: setCaret(content.length); // end
 			case 36: setCaret(0); // home
 
-			case 9, 8: // tab, backspace
+			case 190: inputChar(190);
+
+			case 9, 8, 46: // tab, backspace, delete
 				e.preventDefault();
 				inputChar(e.keyCode);
 
@@ -288,11 +288,18 @@ class Editor
 			case _:
 		}
 	}
+
+	function layoutToText(x:Float, y:Float):Int
+	{
+		x -= gutterWidth * charWidth;
+		var col = Math.round((x * scale) / charWidth);
+		var row = Math.floor((y * scale) / charHeight);
+		return getIndex(col, row);
+	}
+
 	function mouseDown(e)
 	{
-		var col = Math.round((e.clientX * scale) / charWidth);
-		var row = Math.floor((e.clientY * scale) / charHeight);
-		caret1 = caret2 = getIndex(col, row);
+		caret1 = caret2 = layoutToText(e.clientX, e.clientY);
 		render();
 
 		js.Browser.document.body.addEventListener("mousemove", mouseMove);
@@ -300,10 +307,7 @@ class Editor
 
 	function mouseMove(e)
 	{
-		var col = Math.round((e.clientX * scale) / charWidth);
-		var row = Math.floor((e.clientY * scale) / charHeight);
-		
-		caret1 = getIndex(col, row);
+		caret1 = layoutToText(e.clientX, e.clientY);
 		render();
 	}
 
@@ -318,7 +322,7 @@ class Editor
 		context.clearRect(0, 0, canvas.width, canvas.height);
 
 		var region = new Region(caret1, caret2);
-		var x = 0;
+		var x = gutterWidth;
 		var y = 0;
 		
 		for (i in 0...content.length + 1)
@@ -348,7 +352,7 @@ class Editor
 
 			if (code == 10)
 			{
-				x = 0;
+				x = gutterWidth;
 				y ++;
 			}
 			else
@@ -383,4 +387,34 @@ class Editor
 			context.fillText(String.fromCharCode(i), i * nativeWidth, 0);
 		}
 	}
+
+	static var lorem =
+"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed sed purus tempus, 
+facilisis dui id, egestas magna.
+
+Curabitur sagittis, libero quis adipiscing consectetur, odio risus mattis 
+tristique ante nec faucibus dictum. Nulla sapien lectus, pellentesque et mattis 
+a, rutrum quis massa. Ut eget nulla neque. Donec vitae mi mauris. Fusce dolor 
+felis, viverra eget dolor at, luctus dignissim nisl. Etiam eu libero 
+scelerisque metus volutpat pulvinar accumsan nec neque.
+
+Vestibulum ante ipsum primis in faucibus orci luctus.
+
+Suspendisse euismod posuere mi, ac pretium eros. In in metus pulvinar, 
+elementum nibh eget, congue massa. Vestibulum eros elit, pellentesque at massa 
+sed, rhoncus laoreet purus. Proin interdum mauris sed enim posuere 
+pellentesque. Maecenas facilisis blandit hendrerit. Pellentesque ut velit 
+eleifend, commodo nisl vitae, vehicula orci. Suspendisse pellentesque auctor 
+orci in pretium.
+
+Vestibulum accumsan malesuada ante, ut suscipit neque rhoncus vitae. Nunc 
+sagittis tincidunt ligula, sit amet ultricies nibh eleifend vitae. Nullam vel 
+bibendum ipsum. Vestibulum in nisl bibendum, ultricies augue a, ullamcorper 
+sem. Mauris euismod urna eros, a placerat leo tincidunt sed. Vestibulum luctus 
+metus ut vestibulum congue. Sed rutrum aliquet metus, at gravida nunc volutpat 
+mattis. Praesent congue nisl quis augue euismod, quis dignissim diam mattis. 
+Morbi malesuada blandit nulla sit amet ultrices. Pellentesque vitae ornare dui, 
+vel euismod velit. Ut quam erat, congue id tellus vel, pharetra laoreet tortor. 
+Proin feugiat, enim et pulvinar ornare, lorem erat consequat urna, vel 
+sollicitudin libero erat vitae tellus.";
 }

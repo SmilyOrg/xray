@@ -16,7 +16,7 @@ HxOverrides.substr = function(s,pos,len) {
 }
 var edit = {}
 edit.Editor = function() {
-	this.gutterWidth = 3;
+	this.gutterWidth = 30;
 	this.content = "";
 	this.fontSize = 14;
 	this.caret1 = this.caret2 = 0;
@@ -72,7 +72,7 @@ edit.Editor.prototype = {
 		var context = this.canvas.getContext("2d");
 		context.clearRect(0,0,this.canvas.width,this.canvas.height);
 		var region = new edit.Region(this.caret1,this.caret2);
-		var x = this.gutterWidth;
+		var x = 0;
 		var y = 0;
 		var _g1 = 0, _g = this.content.length + 1;
 		while(_g1 < _g) {
@@ -82,15 +82,15 @@ edit.Editor.prototype = {
 			if(code == 9) w = Math.floor(x / 4) * 4 + 4 - x;
 			if(!region.isEmpty() && i >= region.begin && i < region.end) {
 				context.fillStyle = "orange";
-				context.fillRect(x * this.charWidth,y * this.charHeight,this.charWidth * w,this.charHeight);
+				context.fillRect(this.gutterWidth + x * this.charWidth,y * this.charHeight,this.charWidth * w,this.charHeight);
 			}
-			if(code != 10 && code != 9) context.drawImage(this.fontCanvas,code * this.charWidth,0,this.charWidth,this.charHeight,x * this.charWidth,y * this.charHeight,this.charWidth,this.charHeight);
+			if(code != 10 && code != 9) context.drawImage(this.fontCanvas,code * this.charWidth,0,this.charWidth,this.charHeight,this.gutterWidth + x * this.charWidth,y * this.charHeight,this.charWidth,this.charHeight);
 			if(i == this.caret1) {
 				context.fillStyle = "white";
-				context.fillRect(x * this.charWidth,y * this.charHeight,2,this.charHeight);
+				context.fillRect(this.gutterWidth + x * this.charWidth,y * this.charHeight,2,this.charHeight);
 			}
 			if(code == 10) {
-				x = this.gutterWidth;
+				x = 0;
 				y++;
 			} else x += w;
 		}
@@ -107,11 +107,28 @@ edit.Editor.prototype = {
 		this.render();
 		js.Browser.document.body.addEventListener("mousemove",$bind(this,this.mouseMove));
 	}
+	,getLine: function(index) {
+		return this.content.split("\n")[index];
+	}
 	,layoutToText: function(x,y) {
-		x -= this.gutterWidth * this.charWidth;
-		var col = Math.round(x * this.scale / this.charWidth);
+		x -= this.gutterWidth * (1 / this.scale);
+		console.log(x);
 		var row = Math.floor(y * this.scale / this.charHeight);
-		return this.getIndex(col,row);
+		var col = x * this.scale / this.charWidth;
+		var line = this.getLine(row);
+		var charCol = 0;
+		var charX = 0;
+		var _g1 = 0, _g = line.length;
+		while(_g1 < _g) {
+			var i = _g1++;
+			var code = HxOverrides.cca(line,i);
+			var w = 1;
+			if(code == 9) w = Math.floor(charX / 4) * 4 + 4 - charX;
+			if(charX + w / 2 >= col) break;
+			charCol += 1;
+			charX += w;
+		}
+		return this.getIndex(charCol,row);
 	}
 	,keyUp: function(e) {
 		switch(e.keyCode) {
@@ -172,7 +189,7 @@ edit.Editor.prototype = {
 			break;
 		case 37:case 39:
 			var delta = e.keyCode == 37?-1:1;
-			if(this.alt) this.caret1 = this.wordBoundary(this.caret1,delta); else if(region.isEmpty() || this.shift) this.caret1 = this.caret1 + delta; else if(delta > 0) this.caret1 = region.end; else this.caret1 = region.begin;
+			if(this.alt) this.caret1 = this.wordBoundary(this.caret1,delta); else if(region.isEmpty() || this.shift) this.caret1 = this.caret1 + delta; else this.caret1 = delta > 0?region.end:region.begin;
 			if(this.caret1 < 0) this.caret1 = 0; else if(this.caret1 > this.content.length) this.caret1 = this.content.length;
 			if(!this.shift) this.caret2 = this.caret1;
 			this.render();
@@ -219,6 +236,7 @@ edit.Editor.prototype = {
 			var line = lines[i];
 			if(i == row) {
 				if(col > line.length) col = line.length;
+				if(col < 0) col = 0;
 				return index + col;
 			} else index += line.length + 1;
 		}

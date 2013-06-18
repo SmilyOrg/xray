@@ -6,20 +6,22 @@ import js.html.CanvasRenderingContext2D;
 
 class Editor
 {
+	static function main() new Editor();
+
+	var gutterWidth:Int;
+	var fontSize:Int;
+
+	var selection:RegionSet;
+	var mouseSelection:Region;
 	var canvas:CanvasElement;
+	var fontCanvas:CanvasElement;
+
 	var scale:Float;
-	
 	var width:Int;
 	var height:Int;
 
-	var fontSize:Int;
-	var fontCanvas:CanvasElement;
-
 	var charWidth:Int;
 	var charHeight:Int;
-
-	var caret1:Int;
-	var caret2:Int;
 
 	var shift:Bool;
 	var ctrl:Bool;
@@ -27,67 +29,66 @@ class Editor
 	var cmd:Bool;
 
 	var content = "";
-	var gutterWidth = 30;
-
-	static function main()
-	{
-		new Editor();
-	}
-
+	
 	public function new()
 	{
-		fontSize = 14;
-		caret1 = caret2 = 0;
+		// config
+		fontSize = 16;
+		gutterWidth = 30;
 
-		// device scale
-		scale = js.Browser.window.devicePixelRatio;
+		var document = js.Browser.document;
+		var window = js.Browser.window;
+		var body = document.body;
+
+		// handle device pixel ratio
+		scale = window.devicePixelRatio;
+
+		// generate font
+		fontCanvas = generateFont();
+		
+		// init selection
+		selection = new RegionSet();
+		selection.add(new Region(0, 0));
+
+		// create canvas
+		canvas = document.createCanvasElement();
+		body.appendChild(canvas);
+
+		// create canvas
+		canvas.width = Std.int(window.innerWidth * scale);
+		canvas.height = Std.int(window.innerHeight * scale);
+
 		var invScale = 1 / scale;
-
-		fontCanvas = js.Browser.document.createCanvasElement();
-		// js.Browser.document.body.appendChild(fontCanvas);
-
-		untyped fontCanvas.style.webkitTransformOrigin = "top left";
-		untyped fontCanvas.style.webkitTransform = 'scale($invScale,$invScale)';
-
-		generateFont();
-
-		canvas = js.Browser.document.createCanvasElement();
-		js.Browser.document.body.appendChild(canvas);
-
 		untyped canvas.style.webkitTransformOrigin = "top left";
 		untyped canvas.style.webkitTransform = 'scale($invScale,$invScale)';
-
-		canvas.width = Std.int(js.Browser.window.innerWidth * scale);
-		canvas.height = Std.int(js.Browser.window.innerHeight * scale);
-
-		var body = js.Browser.document.body;
+		
+		// events
 		body.addEventListener("keypress", keyPress);
 		body.addEventListener("keydown", keyDown);
 		body.addEventListener("keyup", keyUp);
 		body.addEventListener("mousedown", mouseDown);
 		body.addEventListener("mouseup", mouseUp);
 
-		js.Browser.document.addEventListener("paste", paste);
-		js.Browser.document.addEventListener("copy", copy);
-		js.Browser.document.addEventListener("cut", cut);
+		document.addEventListener("paste", paste);
+		document.addEventListener("copy", copy);
+		document.addEventListener("cut", cut);
 
+		// initial content
 		content = lorem;
 		render();
 	}
 
 	function cut(e)
 	{
-		var region = new Region(caret1, caret2);
 		e.preventDefault();
-		e.clipboardData.setData("text/plain", content.substring(region.begin, region.end));
+		e.clipboardData.setData("text/plain", getRegions(selection));
 		insertText("");
 	}
 
 	function copy(e)
 	{
-		var region = new Region(caret1, caret2);
 		e.preventDefault();
-		e.clipboardData.setData("text/plain", content.substring(region.begin, region.end));
+		e.clipboardData.setData("text/plain", getRegions(selection));
 	}
 
 	function paste(e)
@@ -97,48 +98,58 @@ class Editor
 
 	function insertText(text:String)
 	{
-		var region = new Region(caret1, caret2);
-		content = content.substr(0, region.begin) + text + content.substr(region.end);
-		caret1 = caret2 = region.begin + text.length;
+		// calculate blocks
+		var index = 0;
+		var blocks = [];
+		for (region in selection)
+		{
+			blocks.push(content.substring(index, region.begin()));
+			index = region.end();
+		}
+		blocks.push(content.substr(index));
+
+		// update selection
+		var len = text.length;
+		for (region in selection) region.a = region.b = region.begin() + len;
+
+		// update content
+		content = blocks.join(text);
 		render();
 	}
 
 	function inputChar(code:Int)
 	{
 		var char = String.fromCharCode(code == 190 ? 46 : code);
-		var region = new Region(caret1, caret2);
-		trace(code);
+		
 		switch (code)
 		{
 			case 8, 46: // backspace, delete
 				char = "";
-
-				if (region.isEmpty())
+				var move = true;
+				for (region in selection)
 				{
-					if (code == 8)
-					{
-						if (caret1 == 0) return;
-						caret1 --;
-						region = new Region(caret1, caret2);
-					}
-					else
-					{
-						region = new Region(caret1, caret2 + 1);
-					}
-				}
-				else
-				{
-					caret1 = region.begin;
+					if (!region.isEmpty()) move = false;
+					region.a = region.end();
 				}
 
-			case _:
-				caret1 = region.begin + 1;
+				if (move)
+				{
+					for (region in selection)
+					{
+						if (code == 8)
+						{
+							if (region.a > 0) region.a -=1;
+						}
+						else
+						{
+							if (region.b < content.length) region.b += 1;
+						}
+					}
+				}
+			default:
 		}
 
-		content = content.substr(0, region.begin) + char + content.substr(region.end);
-
-		caret2 = caret1;
-		render();
+		insertText(char);
 	}
 
 	function getPosition(index:Int):{col:Int, row:Int}
@@ -178,12 +189,12 @@ class Editor
 	function setCaret(index:Int)
 	{
 		// check bounds
-		if (index < 0) index = 0;
-		else if (index > content.length) index = content.length;
+		// if (index < 0) index = 0;
+		// else if (index > content.length) index = content.length;
 
-		caret1 = index;
-		if (!shift) caret2 = caret1;
-		render();
+		// caret1 = index;
+		// if (!shift) caret2 = caret1;
+		// render();
 	}
 
 	function keyPress(e)
@@ -196,8 +207,6 @@ class Editor
 
 	function keyDown(e)
 	{
-		var region = new Region(caret1, caret2);
-		
 		trace(e.keyCode);
 		switch (e.keyCode)
 		{
@@ -217,50 +226,39 @@ class Editor
 
 			case 37,39: // left, right
 				var delta = e.keyCode == 37 ? -1 : 1;
-				
-				if (alt)
+				for (region in selection)
 				{
-					caret1 = wordBoundary(caret1, delta);
+					if (alt) region.b = wordBoundary(region.b, delta);
+					else if (region.isEmpty() || shift) region.b += delta;
+					else region.b = delta > 0 ? region.end() : region.begin();
+					if (!shift) region.a = region.b;
 				}
-				else
-				{
-					if (region.isEmpty() || shift)
-					{
-						caret1 = caret1 + delta;
-					}
-					else
-					{
-						caret1 = delta > 0 ? region.end : region.begin;
-					}
-				}
-				
-				if (caret1 < 0) caret1 = 0;
-				else if (caret1 > content.length) caret1 = content.length;
-				if (!shift) caret2 = caret1;
 				render();
 
 			case 38,40: // up, down
-				if (cmd)
-				{
-					setCaret(e.keyCode == 38 ? 0 : content.length);
-					return;
-				}
+				// if (cmd)
+				// {
+				// 	setCaret(e.keyCode == 38 ? 0 : content.length);
+				// 	return;
+				// }
 
 				var delta = e.keyCode == 38 ? -1 : 1;
-				if (region.isEmpty() || shift)
+				for (region in selection)
 				{
-					var pos = getPosition(caret1);
-					caret1 = getIndex(pos.col, pos.row + delta);
+					if (region.isEmpty() || shift)
+					{
+						var pos = getPosition(region.b);
+						region.b = getIndex(pos.col, pos.row + delta);
+					}
+					else
+					{
+						var pos = getPosition(delta > 0 ? region.end() : region.begin());
+						region.b = getIndex(pos.col, pos.row + delta);
+					}
+					if (!shift) region.a = region.b;
 				}
-				else
-				{
-					var pos = getPosition(delta > 0 ? region.end : region.begin);
-					caret1 = getIndex(pos.col, pos.row + delta);
-				}
-				if (!shift) caret2 = caret1;
 				render();
-
-			case _:
+			default:
 		}
 	}
 	
@@ -275,6 +273,8 @@ class Editor
 			index += delta;
 		}
 		if (delta == -1) index += 1;
+		if (index < 0) index = 0;
+		if (index > content.length) index = content.length;
 		return index;
 	}
 
@@ -293,9 +293,12 @@ class Editor
 	// TODO: yuck.
 	function layoutToText(x:Float, y:Float):Int
 	{
-		x -= gutterWidth * (1 / scale);
-		var row = Math.floor((y * scale) / charHeight);
-		var col = (x * scale) / charWidth;
+		x *= scale;
+		y *= scale;
+		x -= gutterWidth;
+
+		var row = Math.floor(y / charHeight);
+		var col = x / charWidth;
 
 		var line = getLine(row);
 		var charCol = 0;
@@ -320,7 +323,10 @@ class Editor
 
 	function mouseDown(e)
 	{
-		caret1 = caret2 = layoutToText(e.clientX, e.clientY);
+		selection.clear();
+		var index = layoutToText(e.clientX, e.clientY);
+		mouseSelection = new Region(index, index);
+		selection.add(mouseSelection);
 		render();
 
 		js.Browser.document.body.addEventListener("mousemove", mouseMove);
@@ -328,12 +334,13 @@ class Editor
 
 	function mouseMove(e)
 	{
-		caret1 = layoutToText(e.clientX, e.clientY);
+		mouseSelection.b = layoutToText(e.clientX, e.clientY);
 		render();
 	}
 
 	function mouseUp(e)
 	{
+		mouseSelection = null;
 		js.Browser.document.body.removeEventListener("mousemove", mouseMove);
 	}
 	
@@ -342,7 +349,16 @@ class Editor
 		var context = canvas.getContext2d();
 		context.clearRect(0, 0, canvas.width, canvas.height);
 
-		var region = new Region(caret1, caret2);
+		var buffer = new Buffer(content);
+
+		var selected = new Map<Int, Bool>();
+		var carets = new Map<Int, Bool>();
+		for (region in selection)
+		{
+			buffer.setFlag(region, Selected);
+			buffer.setFlagAt(region.b, Caret);
+		}
+
 		var x = 0;
 		var y = 0;
 		
@@ -352,10 +368,16 @@ class Editor
 			var w = 1;
 			if (code == 9) w = (Math.floor(x/4)*4+4) - x;
 
-			if (!region.isEmpty() && i >= region.begin && i < region.end)
+			if (buffer.hasFlagAt(i, Selected))
 			{
 				context.fillStyle = "orange";
 				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
+			}
+
+			if (buffer.hasFlagAt(i, Caret))
+			{
+				context.fillStyle = "white";
+				context.fillRect(gutterWidth + x * charWidth, y * charHeight, 2, charHeight);
 			}
 
 			if (code != 10 && code != 9)
@@ -363,12 +385,6 @@ class Editor
 				context.drawImage(fontCanvas, 
 					code * charWidth, 0, charWidth, charHeight,
 					gutterWidth + x * charWidth, y * charHeight, charWidth, charHeight);
-			}
-
-			if (i == caret1)
-			{
-				context.fillStyle = "white";
-				context.fillRect(gutterWidth + x * charWidth, y * charHeight, 2, charHeight);
 			}
 
 			if (code == 10)
@@ -385,18 +401,17 @@ class Editor
 
 	function generateFont()
 	{
+		var fontCanvas = js.Browser.document.createCanvasElement();
 		var context = fontCanvas.getContext2d();
-		context.font = '${fontSize}px Consolas';
+		var size = Std.int(fontSize * scale);
+		context.font = '${size}px Consolas';
 
-		var nativeWidth = Math.ceil(context.measureText("X").width) + 1;
-		charWidth = Math.ceil(nativeWidth * scale);
-		charHeight = Math.ceil(fontSize * scale * 1.2);
+		charWidth = Math.ceil(context.measureText("X").width * 1.1);
+		charHeight = Math.ceil(size * 1.2);
 
 		var totalWidth = 127 * charWidth;
 		fontCanvas.width = totalWidth;
 		fontCanvas.height = charHeight;
-
-		context.scale(scale, scale);
 		context.clearRect(0, 0, totalWidth, charHeight);
 
 		context.fillStyle = "white";
@@ -405,8 +420,27 @@ class Editor
 
 		for (i in 0...127)
 		{
-			context.fillText(String.fromCharCode(i), i * nativeWidth, 0);
+			context.fillText(String.fromCharCode(i), i * charWidth, 0);
 		}
+
+		return fontCanvas;
+	}
+
+	function getRegions(regions:RegionSet)
+	{
+		var text = new StringBuf();
+		for (region in regions) text.add(substr(region));
+		return text.toString();
+	}
+
+	inline function substr(region:Region)
+	{
+		return content.substring(region.begin(), region.end());
+	}
+
+	inline function char(index:Int)
+	{
+		return content.charAt(index);
 	}
 
 	static var lorem =

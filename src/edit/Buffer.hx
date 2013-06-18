@@ -5,13 +5,18 @@ import haxe.EnumFlags;
 
 class Buffer
 {
-	var flags:Bytes;
-	var content:String;
+	public var flags:Bytes;
+	public var content:String;
 
 	public function new(content:String)
 	{
 		this.content = content;
 		this.flags = Bytes.alloc(content.length);
+	}
+
+	public function clearFlags()
+	{
+		flags = Bytes.alloc(content.length);
 	}
 
 	public function insert(index:Int, length:Int, string:String)
@@ -20,7 +25,13 @@ class Buffer
 		var previous = flags;
 		flags = Bytes.alloc(content.length);
 		flags.blit(0, previous, 0, index);
-		flags.blit(0, previous, index+length, previous.length - length);
+		var pos = index + length;
+		flags.blit(0, previous, pos, previous.length - pos);
+	}
+
+	public function replace(region:Region, text:String)
+	{
+		insert(region.begin(), region.size(), text);
 	}
 
 	public function setFlag(region:Region, flag:BufferFlag)

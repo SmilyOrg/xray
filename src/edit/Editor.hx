@@ -28,7 +28,7 @@ class Editor
 	var alt:Bool;
 	var cmd:Bool;
 
-	var content = "";
+	var buffer:Buffer;
 	
 	public function new()
 	{
@@ -74,7 +74,8 @@ class Editor
 		document.addEventListener("cut", cut);
 
 		// initial content
-		content = lorem;
+		buffer = new Buffer(lorem);
+		// content = lorem;
 		render();
 	}
 
@@ -98,22 +99,15 @@ class Editor
 
 	function insertText(text:String)
 	{
-		// calculate blocks
-		var index = 0;
-		var blocks = [];
+		var offset = 0;
+		var size = text.length;
 		for (region in selection)
 		{
-			blocks.push(content.substring(index, region.begin()));
-			index = region.end();
+			// trace(region);
+			buffer.insert(region.begin() + offset, region.size(), text);
+			region.a = region.b = offset + region.begin() + size;
+			offset += region.size() - size;
 		}
-		blocks.push(content.substr(index));
-
-		// update selection
-		var len = text.length;
-		for (region in selection) region.a = region.b = region.begin() + len;
-
-		// update content
-		content = blocks.join(text);
 		render();
 	}
 
@@ -129,7 +123,7 @@ class Editor
 				for (region in selection)
 				{
 					if (!region.isEmpty()) move = false;
-					region.a = region.end();
+					// region.a = region.end();
 				}
 
 				if (move)
@@ -142,7 +136,7 @@ class Editor
 						}
 						else
 						{
-							if (region.b < content.length) region.b += 1;
+							if (region.b < buffer.content.length) region.b += 1;
 						}
 					}
 				}
@@ -154,7 +148,7 @@ class Editor
 
 	function getPosition(index:Int):{col:Int, row:Int}
 	{
-		var lines = content.split("\n");
+		var lines = buffer.content.split("\n");
 		for (i in 0...lines.length)
 		{
 			index -= lines[i].length + 1;
@@ -168,9 +162,9 @@ class Editor
 		if (row < 0) return 0;
 
 		var index = 0;
-		var lines = content.split("\n");
+		var lines = buffer.content.split("\n");
 
-		if (row > lines.length - 1) return content.length;
+		if (row > lines.length - 1) return buffer.content.length;
 
 		for (i in 0...lines.length)
 		{
@@ -207,7 +201,7 @@ class Editor
 
 	function keyDown(e)
 	{
-		trace(e.keyCode);
+		// trace(e.keyCode);
 		switch (e.keyCode)
 		{
 			case 16: shift = true;
@@ -215,7 +209,7 @@ class Editor
 			case 18: alt = true;
 			case 91: cmd = true;
 
-			case 35: setCaret(content.length); // end
+			case 35: setCaret(buffer.content.length); // end
 			case 36: setCaret(0); // home
 
 			case 190: inputChar(190);
@@ -264,17 +258,18 @@ class Editor
 	
 	function wordBoundary(index:Int, delta:Int)
 	{
+		var size = buffer.content.length;
 		var wordChars = " \n./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?";
 		index += delta;
 		if (delta == -1) index += delta;
-		while (index > -1 && index < content.length - 1)
+		while (index > -1 && index < size - 1)
 		{
-			if (wordChars.indexOf(content.charAt(index)) > -1) break;
+			if (wordChars.indexOf(buffer.content.charAt(index)) > -1) break;
 			index += delta;
 		}
 		if (delta == -1) index += 1;
 		if (index < 0) index = 0;
-		if (index > content.length) index = content.length;
+		if (index > size) index = size;
 		return index;
 	}
 
@@ -318,7 +313,7 @@ class Editor
 
 	function getLine(index:Int)
 	{
-		return content.split("\n")[index];
+		return buffer.content.split("\n")[index];
 	}
 
 	function mouseDown(e)
@@ -349,10 +344,11 @@ class Editor
 		var context = canvas.getContext2d();
 		context.clearRect(0, 0, canvas.width, canvas.height);
 
-		var buffer = new Buffer(content);
+		// var buffer = new Buffer(content);
 
 		var selected = new Map<Int, Bool>();
 		var carets = new Map<Int, Bool>();
+		buffer.clearFlags();
 		for (region in selection)
 		{
 			buffer.setFlag(region, Selected);
@@ -362,9 +358,9 @@ class Editor
 		var x = 0;
 		var y = 0;
 		
-		for (i in 0...content.length + 1)
+		for (i in 0...buffer.content.length + 1)
 		{
-			var code = content.charCodeAt(i);
+			var code = buffer.content.charCodeAt(i);
 			var w = 1;
 			if (code == 9) w = (Math.floor(x/4)*4+4) - x;
 
@@ -402,21 +398,26 @@ class Editor
 	function generateFont()
 	{
 		var fontCanvas = js.Browser.document.createCanvasElement();
+		// js.Browser.document.body.appendChild(fontCanvas);
+		
+		var invScale = 1 / scale;
+		untyped fontCanvas.style.webkitTransformOrigin = "top left";
+		untyped fontCanvas.style.webkitTransform = 'scale($invScale,$invScale)';
+
 		var context = fontCanvas.getContext2d();
 		var size = Std.int(fontSize * scale);
 		context.font = '${size}px Consolas';
 
-		charWidth = Math.ceil(context.measureText("X").width * 1.1);
-		charHeight = Math.ceil(size * 1.2);
+		charWidth = Math.ceil(context.measureText(".").width);
+		charHeight = Math.ceil(size);
 
 		var totalWidth = 127 * charWidth;
 		fontCanvas.width = totalWidth;
 		fontCanvas.height = charHeight;
-		context.clearRect(0, 0, totalWidth, charHeight);
 
 		context.fillStyle = "white";
 		context.textBaseline = "top";
-		context.font = '${fontSize}px monospace';
+		context.font = '${size}px Consolas';
 
 		for (i in 0...127)
 		{
@@ -435,12 +436,12 @@ class Editor
 
 	inline function substr(region:Region)
 	{
-		return content.substring(region.begin(), region.end());
+		return buffer.content.substring(region.begin(), region.end());
 	}
 
 	inline function char(index:Int)
 	{
-		return content.charAt(index);
+		return buffer.content.charAt(index);
 	}
 
 	static var lorem =

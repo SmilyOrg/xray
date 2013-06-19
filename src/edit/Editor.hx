@@ -11,7 +11,7 @@ class Editor
 	var gutterWidth:Int;
 	var fontSize:Int;
 
-	var selection:RegionSet;
+	public var selection:RegionSet;
 	var mouseSelection:Region;
 	var canvas:CanvasElement;
 	var fontCanvas:CanvasElement;
@@ -29,9 +29,12 @@ class Editor
 	var cmd:Bool;
 
 	var buffer:Buffer;
-	
+	var move:MoveCommand;
+
 	public function new()
 	{
+		move = new MoveCommand(this);
+
 		// config
 		fontSize = 16;
 		gutterWidth = 30;
@@ -218,40 +221,46 @@ class Editor
 				e.preventDefault();
 				inputChar(e.keyCode);
 
-			case 37,39: // left, right
-				var delta = e.keyCode == 37 ? -1 : 1;
-				for (region in selection)
-				{
-					if (alt) region.b = wordBoundary(region.b, delta);
-					else if (region.isEmpty() || shift) region.b += delta;
-					else region.b = delta > 0 ? region.end() : region.begin();
-					if (!shift) region.a = region.b;
-				}
-				render();
+			case 37: move.run({by:"characters", forward:false, extend:shift}); // left
+			case 39: move.run({by:"characters", forward:true, extend:shift}); // right
+			case 38: move.run({by:"lines", forward:false, extend:shift}); // up
+			case 40: move.run({by:"lines", forward:true, extend:shift}); // down
 
-			case 38,40: // up, down
+				// var forward = e.keyCode == 37;
+
+				// var delta = e.keyCode == 37 ? -1 : 1;
+				// for (region in selection)
+				// {
+				// 	if (alt) region.b = wordBoundary(region.b, delta);
+				// 	else if (region.isEmpty() || shift) region.b += delta;
+				// 	else region.b = delta > 0 ? region.end() : region.begin();
+				// 	if (!shift) region.a = region.b;
+				// }
+				// render();
+
+			// case 38,40: // up, down
 				// if (cmd)
 				// {
 				// 	setCaret(e.keyCode == 38 ? 0 : content.length);
 				// 	return;
 				// }
 
-				var delta = e.keyCode == 38 ? -1 : 1;
-				for (region in selection)
-				{
-					if (region.isEmpty() || shift)
-					{
-						var pos = getPosition(region.b);
-						region.b = getIndex(pos.col, pos.row + delta);
-					}
-					else
-					{
-						var pos = getPosition(delta > 0 ? region.end() : region.begin());
-						region.b = getIndex(pos.col, pos.row + delta);
-					}
-					if (!shift) region.a = region.b;
-				}
-				render();
+				// var delta = e.keyCode == 38 ? -1 : 1;
+				// for (region in selection)
+				// {
+				// 	if (region.isEmpty() || shift)
+				// 	{
+				// 		var pos = getPosition(region.b);
+				// 		region.b = getIndex(pos.col, pos.row + delta);
+				// 	}
+				// 	else
+				// 	{
+				// 		var pos = getPosition(delta > 0 ? region.end() : region.begin());
+				// 		region.b = getIndex(pos.col, pos.row + delta);
+				// 	}
+				// 	if (!shift) region.a = region.b;
+				// }
+				// render();
 			default:
 		}
 	}
@@ -311,6 +320,33 @@ class Editor
 		return getIndex(charCol, row);
 	}
 
+	public function line(index:Int):Region
+	{
+		var full = fullLine(index);
+		if (char(full.b - 1) == "\n") full.b -= 1;
+		return full;
+	}
+
+	public function fullLine(index:Int):Region
+	{
+		var a = find(index - 1, -1, "\n");
+		if (a > 0) a += 1;
+		var b = find(index, 1, "\n");
+		return new Region(a, b);
+	}
+
+	function find(index:Int, dir:Int, chars:String):Int
+	{
+		var size = size();
+		while (true)
+		{
+			if (index < 0) return 0;
+			if (index > size) return size;
+			if (chars.indexOf(char(index)) > -1) return (dir > 0 ? index + 1 : index);
+			index += dir;
+		}
+	}
+
 	function getLine(index:Int)
 	{
 		return buffer.content.split("\n")[index];
@@ -339,7 +375,7 @@ class Editor
 		js.Browser.document.body.removeEventListener("mousemove", mouseMove);
 	}
 	
-	function render()
+	public function render()
 	{
 		var context = canvas.getContext2d();
 		context.clearRect(0, 0, canvas.width, canvas.height);
@@ -434,14 +470,19 @@ class Editor
 		return text.toString();
 	}
 
-	inline function substr(region:Region)
+	inline public function substr(region:Region)
 	{
 		return buffer.content.substring(region.begin(), region.end());
 	}
 
-	inline function char(index:Int)
+	inline public function char(index:Int)
 	{
 		return buffer.content.charAt(index);
+	}
+	
+	inline public function size()
+	{
+		return buffer.content.length;
 	}
 
 	static var lorem =

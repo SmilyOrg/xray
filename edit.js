@@ -266,6 +266,10 @@ edit.Editor = function() {
 	var body = document.body;
 	this.edit = new edit.Edit(this);
 	this.edits = [this.edit];
+	this.scrollX = 0;
+	this.scrollY = 0;
+	this.maxScrollX = 0;
+	this.maxScrollY = 0;
 	this.scale = window.devicePixelRatio;
 	this.generateFont();
 	this.selection = new edit.RegionSet();
@@ -277,6 +281,7 @@ edit.Editor = function() {
 	var invScale = 1 / this.scale;
 	this.canvas.style.webkitTransformOrigin = "top left";
 	this.canvas.style.webkitTransform = "scale(" + invScale + "," + invScale + ")";
+	this.context = this.canvas.getContext("2d");
 	document.addEventListener("paste",$bind(this,this.paste));
 	document.addEventListener("copy",$bind(this,this.copy));
 	document.addEventListener("cut",$bind(this,this.cut));
@@ -327,8 +332,10 @@ edit.Editor.prototype = {
 		return text.b;
 	}
 	,render: function() {
-		var context = this.canvas.getContext("2d");
-		context.clearRect(0,0,this.canvas.width,this.canvas.height);
+		this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
+		console.log(this.scrollY);
+		this.context.save();
+		this.context.translate(-this.scrollX,-this.scrollY);
 		var selected = new haxe.ds.IntMap();
 		var carets = new haxe.ds.IntMap();
 		this.buffer.clearFlags();
@@ -347,19 +354,26 @@ edit.Editor.prototype = {
 			var w = 1;
 			if(code == 9) w = Math.floor(x / 4) * 4 + 4 - x;
 			if(this.buffer.hasFlagAt(i,edit.BufferFlag.Selected)) {
-				context.fillStyle = "orange";
-				context.fillRect(this.gutterWidth + x * this.charWidth,y * this.charHeight,this.charWidth * w,this.charHeight);
+				this.context.fillStyle = "orange";
+				this.context.fillRect(this.gutterWidth + x * this.charWidth,y * this.charHeight,this.charWidth * w,this.charHeight);
 			}
 			if(this.buffer.hasFlagAt(i,edit.BufferFlag.Caret)) {
-				context.fillStyle = "white";
-				context.fillRect(this.gutterWidth + x * this.charWidth,y * this.charHeight,2,this.charHeight);
+				this.context.fillStyle = "white";
+				this.context.fillRect(this.gutterWidth + x * this.charWidth,y * this.charHeight,2,this.charHeight);
 			}
-			if(code != 10 && code != 9) context.drawImage(this.fontCanvas,code * this.charWidth,0,this.charWidth,this.charHeight,this.gutterWidth + x * this.charWidth,y * this.charHeight,this.charWidth,this.charHeight);
+			if(code != 10 && code != 9) this.context.drawImage(this.fontCanvas,code * this.charWidth,0,this.charWidth,this.charHeight,this.gutterWidth + x * this.charWidth,y * this.charHeight,this.charWidth,this.charHeight);
 			if(code == 10) {
 				x = 0;
 				y++;
 			} else x += w;
 		}
+		this.maxScrollY = y * this.charHeight - this.canvas.height;
+		this.context.restore();
+	}
+	,scroll: function(x,y) {
+		this.scrollX = Math.max(0,Math.min(this.maxScrollX,this.scrollX - x)) | 0;
+		this.scrollY = Math.max(0,Math.min(this.maxScrollY,this.scrollY - y)) | 0;
+		this.render();
 	}
 	,getLine: function(index) {
 		return this.buffer.content.split("\n")[index];
@@ -397,6 +411,8 @@ edit.Editor.prototype = {
 		x *= this.scale;
 		y *= this.scale;
 		x -= this.gutterWidth;
+		x += this.scrollX;
+		y += this.scrollY;
 		var row = Math.floor(y / this.charHeight);
 		var col = x / this.charWidth;
 		var line = this.getLine(row);
@@ -507,6 +523,8 @@ edit.Input = function(view) {
 	body.addEventListener("keypress",$bind(this,this.keyPress));
 	body.addEventListener("mousedown",$bind(this,this.mouseDown));
 	body.addEventListener("mouseup",$bind(this,this.mouseUp));
+	body.addEventListener("mousewheel",$bind(this,this.mouseWheel));
+	body.addEventListener("scroll",$bind(this,this.scroll));
 	var platform = js.Browser.window.navigator.platform;
 	var os = platform.indexOf("Mac") > -1?"mac":"win";
 	var http = new haxe.Http("keymap-" + os + ".json");
@@ -636,6 +654,10 @@ edit.Input.prototype = {
 		this.mouseSelection = null;
 		js.Browser.document.body.removeEventListener("mousemove",$bind(this,this.mouseMove));
 	}
+	,mouseWheel: function(e) {
+		e.preventDefault();
+		this.view.scroll(e.wheelDeltaX,e.wheelDeltaY);
+	}
 	,mouseMove: function(e) {
 		this.mouseSelection.b = this.view.layoutToText(e.clientX,e.clientY);
 		this.view.render();
@@ -751,6 +773,10 @@ edit.Input.prototype = {
 				break;
 			}
 		}
+	}
+	,scroll: function(e) {
+		js.Browser.document.body.scrollTop = 0;
+		js.Browser.document.body.scrollLeft = 0;
 	}
 	,__class__: edit.Input
 }

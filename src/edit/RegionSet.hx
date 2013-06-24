@@ -16,26 +16,27 @@ class RegionSet
 
 	public function add(region:Region)
 	{
-		if (regions.length == 0)
-		{
-			regions.push(region);
-			return;
-		}
+		regions.push(region);
+		// if (regions.length == 0)
+		// {
+		// 	regions.push(region);
+		// 	return;
+		// }
 		
-		var merged = [];
-		for (existing in regions)
-		{
-			if (existing.intersects(region))
-			{
-				region = region.cover(existing);
-			}
-			else
-			{
-				if (region.begin() < existing.begin()) merged.push(region);
-				merged.push(existing);
-			}
-		}
-		regions = merged;
+		// var merged = [];
+		// for (existing in regions)
+		// {
+		// 	if (existing.intersects(region))
+		// 	{
+		// 		region = region.cover(existing);
+		// 	}
+		// 	else
+		// 	{
+		// 		if (region.begin() < existing.begin()) merged.push(region);
+		// 		merged.push(existing);
+		// 	}
+		// }
+		// regions = merged;
 	}
 
 	public function addAll(regions:Array<Region>)
@@ -46,5 +47,15 @@ class RegionSet
 	public function iterator()
 	{
 		return regions.iterator();
+	}
+
+	public function get(index:Int)
+	{
+		return regions[index];
+	}
+
+	public function last()
+	{
+		return get(regions.length - 1);
 	}
 }

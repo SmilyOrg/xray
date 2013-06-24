@@ -1,4 +1,4 @@
-package edit;
+package edit.command;
 
 class TextCommand
 {

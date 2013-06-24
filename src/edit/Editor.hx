@@ -8,12 +8,15 @@ class Editor
 {
 	static function main() new Editor();
 
-	var gutterWidth:Int;
-	var fontSize:Int;
-
 	public var selection:RegionSet;
-	var mouseSelection:Region;
+	public var buffer:Buffer;
+	public var fontSize:Int;
+	public var edits:Array<Edit>;
+	public var edit:Edit;
+
+	var gutterWidth:Int;
 	var canvas:CanvasElement;
+	var context:CanvasRenderingContext2D;
 	var fontCanvas:CanvasElement;
 
 	var scale:Float;
@@ -23,18 +26,14 @@ class Editor
 	var charWidth:Int;
 	var charHeight:Int;
 
-	var shift:Bool;
-	var ctrl:Bool;
-	var alt:Bool;
-	var cmd:Bool;
+	var scrollX:Int;
+	var scrollY:Int;
 
-	var buffer:Buffer;
-	var move:MoveCommand;
+	var maxScrollX:Int;
+	var maxScrollY:Int;
 
 	public function new()
 	{
-		move = new MoveCommand(this);
-
 		// config
 		fontSize = 16;
 		gutterWidth = 30;
@@ -43,11 +42,21 @@ class Editor
 		var window = js.Browser.window;
 		var body = document.body;
 
+		edit = new Edit(this);
+		edits = [edit];
+
+		// scroll position
+		scrollX = 0;
+		scrollY = 0;
+
+		maxScrollX = 0;
+		maxScrollY = 0;
+
 		// handle device pixel ratio
 		scale = window.devicePixelRatio;
 
 		// generate font
-		fontCanvas = generateFont();
+		generateFont();
 		
 		// init selection
 		selection = new RegionSet();
@@ -65,28 +74,77 @@ class Editor
 		untyped canvas.style.webkitTransformOrigin = "top left";
 		untyped canvas.style.webkitTransform = 'scale($invScale,$invScale)';
 		
-		// events
-		body.addEventListener("keypress", keyPress);
-		body.addEventListener("keydown", keyDown);
-		body.addEventListener("keyup", keyUp);
-		body.addEventListener("mousedown", mouseDown);
-		body.addEventListener("mouseup", mouseUp);
+		context = canvas.getContext2d();
 
 		document.addEventListener("paste", paste);
 		document.addEventListener("copy", copy);
 		document.addEventListener("cut", cut);
 
-		// initial content
-		buffer = new Buffer(lorem);
-		// content = lorem;
+		setContent("");
+		new Input(this);
+	}
+
+	public function beginEdit(?command:String, ?args:Dynamic):Edit
+	{
+		return new Edit(this);
+	}
+
+	public function endEdit(edit:Edit)
+	{
+		edits.push(edit);
+	}
+
+	public function insert(edit:Edit, point:Int, string:String)
+	{
+		if (edit != null) edit.insert(point, string);
+		buffer.insert(point, 0, string);
+	}
+
+	public function erase(edit:Edit, region:Region)
+	{
+		if (edit != null) edit.erase(region);
+		buffer.insert(region.begin(), region.size(), "");
+	}
+
+	public function replace(edit:Edit, region:Region, string:String)
+	{
+		erase(edit, region);
+		insert(edit, region.begin(), string);
+	}
+
+	public function setContent(string:String)
+	{
+		buffer = new Buffer(string);
 		render();
+	}
+
+	public function runCommand(name:String, ?args:Dynamic)
+	{
+		var className = "edit.command.";
+		for (part in name.split("_"))
+			className += part.charAt(0).toUpperCase() + part.substr(1);
+		className += "Command";
+
+		var command = Type.resolveClass(className);
+		if (command == null)
+		{
+			trace("command not found: " + name);
+			return;
+		}
+		
+		if (args != null) trace(name + ":" + args);
+		else trace(name);
+		
+		if (args == null) args = {};
+		var command:Dynamic = Type.createInstance(command, [this]);
+		command.run(args);
 	}
 
 	function cut(e)
 	{
 		e.preventDefault();
 		e.clipboardData.setData("text/plain", getRegions(selection));
-		insertText("");
+		runCommand("insert", {characters:""});
 	}
 
 	function copy(e)
@@ -97,56 +155,8 @@ class Editor
 
 	function paste(e)
 	{
-		insertText(e.clipboardData.getData("text/plain"));
-	}
-
-	function insertText(text:String)
-	{
-		var offset = 0;
-		var size = text.length;
-		for (region in selection)
-		{
-			// trace(region);
-			buffer.insert(region.begin() + offset, region.size(), text);
-			region.a = region.b = offset + region.begin() + size;
-			offset += region.size() - size;
-		}
-		render();
-	}
-
-	function inputChar(code:Int)
-	{
-		var char = String.fromCharCode(code == 190 ? 46 : code);
-		
-		switch (code)
-		{
-			case 8, 46: // backspace, delete
-				char = "";
-				var move = true;
-				for (region in selection)
-				{
-					if (!region.isEmpty()) move = false;
-					// region.a = region.end();
-				}
-
-				if (move)
-				{
-					for (region in selection)
-					{
-						if (code == 8)
-						{
-							if (region.a > 0) region.a -=1;
-						}
-						else
-						{
-							if (region.b < buffer.content.length) region.b += 1;
-						}
-					}
-				}
-			default:
-		}
-
-		insertText(char);
+		var text = e.clipboardData.getData("text/plain");
+		runCommand("insert", {characters:text});
 	}
 
 	function getPosition(index:Int):{col:Int, row:Int}
@@ -183,123 +193,13 @@ class Editor
 		return index;
 	}
 
-	function setCaret(index:Int)
-	{
-		// check bounds
-		// if (index < 0) index = 0;
-		// else if (index > content.length) index = content.length;
-
-		// caret1 = index;
-		// if (!shift) caret2 = caret1;
-		// render();
-	}
-
-	function keyPress(e)
-	{
-		var code = e.keyCode;
-		if (code == 46) return;
-		if (code == 13) code  = 10;
-		inputChar(code);
-	}
-
-	function keyDown(e)
-	{
-		// trace(e.keyCode);
-		switch (e.keyCode)
-		{
-			case 16: shift = true;
-			case 17: ctrl = true;
-			case 18: alt = true;
-			case 91: cmd = true;
-
-			case 35: setCaret(buffer.content.length); // end
-			case 36: setCaret(0); // home
-
-			case 190: inputChar(190);
-
-			case 9, 8, 46: // tab, backspace, delete
-				e.preventDefault();
-				inputChar(e.keyCode);
-
-			case 37: move.run({by:"characters", forward:false, extend:shift}); // left
-			case 39: move.run({by:"characters", forward:true, extend:shift}); // right
-			case 38: move.run({by:"lines", forward:false, extend:shift}); // up
-			case 40: move.run({by:"lines", forward:true, extend:shift}); // down
-
-				// var forward = e.keyCode == 37;
-
-				// var delta = e.keyCode == 37 ? -1 : 1;
-				// for (region in selection)
-				// {
-				// 	if (alt) region.b = wordBoundary(region.b, delta);
-				// 	else if (region.isEmpty() || shift) region.b += delta;
-				// 	else region.b = delta > 0 ? region.end() : region.begin();
-				// 	if (!shift) region.a = region.b;
-				// }
-				// render();
-
-			// case 38,40: // up, down
-				// if (cmd)
-				// {
-				// 	setCaret(e.keyCode == 38 ? 0 : content.length);
-				// 	return;
-				// }
-
-				// var delta = e.keyCode == 38 ? -1 : 1;
-				// for (region in selection)
-				// {
-				// 	if (region.isEmpty() || shift)
-				// 	{
-				// 		var pos = getPosition(region.b);
-				// 		region.b = getIndex(pos.col, pos.row + delta);
-				// 	}
-				// 	else
-				// 	{
-				// 		var pos = getPosition(delta > 0 ? region.end() : region.begin());
-				// 		region.b = getIndex(pos.col, pos.row + delta);
-				// 	}
-				// 	if (!shift) region.a = region.b;
-				// }
-				// render();
-			default:
-		}
-	}
-	
-	function wordBoundary(index:Int, delta:Int)
-	{
-		var size = buffer.content.length;
-		var wordChars = " \n./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?";
-		index += delta;
-		if (delta == -1) index += delta;
-		while (index > -1 && index < size - 1)
-		{
-			if (wordChars.indexOf(buffer.content.charAt(index)) > -1) break;
-			index += delta;
-		}
-		if (delta == -1) index += 1;
-		if (index < 0) index = 0;
-		if (index > size) index = size;
-		return index;
-	}
-
-	function keyUp(e)
-	{
-		switch (e.keyCode)
-		{
-			case 16: shift = false;
-			case 17: ctrl = false;
-			case 18: alt = false;
-			case 91: cmd = false;
-			case _:
-		}
-	}
-
-	// TODO: yuck.
-	function layoutToText(x:Float, y:Float):Int
+	public function layoutToText(x:Float, y:Float):Int
 	{
 		x *= scale;
 		y *= scale;
 		x -= gutterWidth;
+		x += scrollX;
+		y += scrollY;
 
 		var row = Math.floor(y / charHeight);
 		var col = x / charWidth;
@@ -329,22 +229,36 @@ class Editor
 
 	public function fullLine(index:Int):Region
 	{
-		var a = find(index - 1, -1, "\n");
-		if (a > 0) a += 1;
-		var b = find(index, 1, "\n");
+		var a = findLeft(index, "\n");
+		var b = findRight(index, "\n") + 1;
 		return new Region(a, b);
 	}
 
-	function find(index:Int, dir:Int, chars:String):Int
+	public function word(index:Int):Region
+	{
+		var wordChars = " \n./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?";
+		return new Region(findLeft(index, wordChars), findRight(index, wordChars));
+	}
+
+	function findLeft(index:Int, chars:String):Int
+	{
+		while (index > 0)
+		{
+			if (chars.indexOf(char(index - 1)) > -1) break;
+			index -= 1;
+		}
+		return index;
+	}
+
+	function findRight(index:Int, chars:String):Int
 	{
 		var size = size();
-		while (true)
+		while (index <= size)
 		{
-			if (index < 0) return 0;
-			if (index > size) return size;
-			if (chars.indexOf(char(index)) > -1) return (dir > 0 ? index + 1 : index);
-			index += dir;
+			if (chars.indexOf(char(index)) > -1) break;
+			index += 1;
 		}
+		return index;
 	}
 
 	function getLine(index:Int)
@@ -352,35 +266,22 @@ class Editor
 		return buffer.content.split("\n")[index];
 	}
 
-	function mouseDown(e)
+	public function scroll(x:Int, y:Int)
 	{
-		selection.clear();
-		var index = layoutToText(e.clientX, e.clientY);
-		mouseSelection = new Region(index, index);
-		selection.add(mouseSelection);
-		render();
-
-		js.Browser.document.body.addEventListener("mousemove", mouseMove);
-	}
-
-	function mouseMove(e)
-	{
-		mouseSelection.b = layoutToText(e.clientX, e.clientY);
+		scrollX = Std.int(Math.max(0, Math.min(maxScrollX, scrollX - x)));
+		scrollY = Std.int(Math.max(0, Math.min(maxScrollY, scrollY - y)));
+		
 		render();
 	}
 
-	function mouseUp(e)
-	{
-		mouseSelection = null;
-		js.Browser.document.body.removeEventListener("mousemove", mouseMove);
-	}
-	
 	public function render()
 	{
-		var context = canvas.getContext2d();
+		// context.fillStyle = "#272822";
 		context.clearRect(0, 0, canvas.width, canvas.height);
 
-		// var buffer = new Buffer(content);
+		trace(scrollY);
+		context.save();
+		context.translate(-scrollX, -scrollY);
 
 		var selected = new Map<Int, Bool>();
 		var carets = new Map<Int, Bool>();
@@ -429,38 +330,10 @@ class Editor
 				x += w;
 			}
 		}
-	}
 
-	function generateFont()
-	{
-		var fontCanvas = js.Browser.document.createCanvasElement();
-		// js.Browser.document.body.appendChild(fontCanvas);
-		
-		var invScale = 1 / scale;
-		untyped fontCanvas.style.webkitTransformOrigin = "top left";
-		untyped fontCanvas.style.webkitTransform = 'scale($invScale,$invScale)';
+		maxScrollY = y * charHeight - canvas.height;
 
-		var context = fontCanvas.getContext2d();
-		var size = Std.int(fontSize * scale);
-		context.font = '${size}px Consolas';
-
-		charWidth = Math.ceil(context.measureText(".").width);
-		charHeight = Math.ceil(size);
-
-		var totalWidth = 127 * charWidth;
-		fontCanvas.width = totalWidth;
-		fontCanvas.height = charHeight;
-
-		context.fillStyle = "white";
-		context.textBaseline = "top";
-		context.font = '${size}px Consolas';
-
-		for (i in 0...127)
-		{
-			context.fillText(String.fromCharCode(i), i * charWidth, 0);
-		}
-
-		return fontCanvas;
+		context.restore();
 	}
 
 	function getRegions(regions:RegionSet)
@@ -485,33 +358,28 @@ class Editor
 		return buffer.content.length;
 	}
 
-	static var lorem =
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed sed purus tempus, 
-facilisis dui id, egestas magna.
+	public function generateFont()
+	{
+		fontCanvas = js.Browser.document.createCanvasElement();
 
-Curabitur sagittis, libero quis adipiscing consectetur, odio risus mattis 
-tristique ante nec faucibus dictum. Nulla sapien lectus, pellentesque et mattis 
-a, rutrum quis massa. Ut eget nulla neque. Donec vitae mi mauris. Fusce dolor 
-felis, viverra eget dolor at, luctus dignissim nisl. Etiam eu libero 
-scelerisque metus volutpat pulvinar accumsan nec neque.
+		var context = fontCanvas.getContext2d();
+		var size = Std.int(fontSize * scale);
+		context.font = '${size}px Consolas';
 
-Vestibulum ante ipsum primis in faucibus orci luctus.
+		charWidth = Math.ceil(context.measureText(".").width);
+		charHeight = Math.ceil(size);
 
-Suspendisse euismod posuere mi, ac pretium eros. In in metus pulvinar, 
-elementum nibh eget, congue massa. Vestibulum eros elit, pellentesque at massa 
-sed, rhoncus laoreet purus. Proin interdum mauris sed enim posuere 
-pellentesque. Maecenas facilisis blandit hendrerit. Pellentesque ut velit 
-eleifend, commodo nisl vitae, vehicula orci. Suspendisse pellentesque auctor 
-orci in pretium.
+		var totalWidth = 127 * charWidth;
+		fontCanvas.width = totalWidth;
+		fontCanvas.height = charHeight;
 
-Vestibulum accumsan malesuada ante, ut suscipit neque rhoncus vitae. Nunc 
-sagittis tincidunt ligula, sit amet ultricies nibh eleifend vitae. Nullam vel 
-bibendum ipsum. Vestibulum in nisl bibendum, ultricies augue a, ullamcorper 
-sem. Mauris euismod urna eros, a placerat leo tincidunt sed. Vestibulum luctus 
-metus ut vestibulum congue. Sed rutrum aliquet metus, at gravida nunc volutpat 
-mattis. Praesent congue nisl quis augue euismod, quis dignissim diam mattis. 
-Morbi malesuada blandit nulla sit amet ultrices. Pellentesque vitae ornare dui, 
-vel euismod velit. Ut quam erat, congue id tellus vel, pharetra laoreet tortor. 
-Proin feugiat, enim et pulvinar ornare, lorem erat consequat urna, vel 
-sollicitudin libero erat vitae tellus.";
+		context.fillStyle = "white";
+		context.textBaseline = "top";
+		context.font = '${size}px Consolas';
+
+		for (i in 0...127)
+		{
+			context.fillText(String.fromCharCode(i), i * charWidth, 0);
+		}
+	}
 }

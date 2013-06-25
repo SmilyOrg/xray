@@ -1,9 +1,0 @@
--main xray.Client
--cp src
--cp /ws/hxparse/src
--js pages/index.js
--dce no
-
---next
-
--cmd cp res/* pages

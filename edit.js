@@ -300,7 +300,7 @@ edit.Editor.prototype = {
 		this.fontCanvas = js.Browser.document.createElement("canvas");
 		var context = this.fontCanvas.getContext("2d");
 		var size = this.fontSize * this.scale | 0;
-		context.font = "" + size + "px Consolas monospace";
+		context.font = "" + size + "px Consolas, monospace";
 		this.charWidth = Math.ceil(context.measureText(".").width);
 		this.charHeight = Math.ceil(size);
 		var totalWidth = 127 * this.charWidth;
@@ -308,7 +308,7 @@ edit.Editor.prototype = {
 		this.fontCanvas.height = this.charHeight;
 		context.fillStyle = "white";
 		context.textBaseline = "top";
-		context.font = "" + size + "px Consolas monospace";
+		context.font = "" + size + "px Consolas, monospace";
 		var _g = 0;
 		while(_g < 127) {
 			var i = _g++;

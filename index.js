@@ -4799,6 +4799,7 @@ xray.Client.prototype = {
 		if(this.line > -1) js.Browser.document.getElementById("L" + this.line).scrollIntoView(); else js.Browser.document.getElementById("L1").scrollIntoView();
 	}
 	,showPath: function(url) {
+		this.clearLines();
 		var parts = url.split(":");
 		this.line = -1;
 		if(parts.length > 1) {
@@ -4848,9 +4849,11 @@ xray.Client.prototype = {
 			var i = _g1++;
 			lines += "#L" + i + " { background: #444; } ";
 		}
-		if(this.styles.firstChild != null) this.styles.removeChild(this.styles.firstChild);
 		this.styles.appendChild(js.Browser.document.createTextNode(lines));
-		haxe.Log.trace(min + ":" + max,{ fileName : "Client.hx", lineNumber : 62, className : "xray.Client", methodName : "highlightLines"});
+		haxe.Log.trace(min + ":" + max,{ fileName : "Client.hx", lineNumber : 66, className : "xray.Client", methodName : "highlightLines"});
+	}
+	,clearLines: function() {
+		if(this.styles.firstChild != null) this.styles.removeChild(this.styles.firstChild);
 	}
 	,parseSources: function(data) {
 		this.sources = haxe.Unserializer.run(data);

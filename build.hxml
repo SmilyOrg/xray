@@ -1,0 +1,6 @@
+-cmd cp res/* pages
+
+-main edit.Editor
+-js pages/edit.js
+-cp src
+--macro include('edit')

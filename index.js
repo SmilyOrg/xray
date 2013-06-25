@@ -4456,7 +4456,7 @@ xhx.HaxeMarkup.punion = function(p1,p2) {
 }
 xhx.HaxeMarkup.prototype = {
 	resolveType: function(type) {
-		if(type == this.name) return this.resolveHref(this.module,[1]);
+		if(type == this.name) return this.resolveHref(this.module,this.exports.get(this.module)[0].pos);
 		if(this.exports.exists(this.module)) {
 			var _g = 0, _g1 = this.exports.get(this.module);
 			while(_g < _g1.length) {
@@ -4477,10 +4477,9 @@ xhx.HaxeMarkup.prototype = {
 				if($export.name == type) return this.resolveHref(i,$export.pos);
 			}
 		}
-		if(this.exports.exists(type)) return this.resolveHref(type,[1]);
+		if(this.exports.exists(type)) return this.resolveHref(type,this.exports.get(type)[0].pos);
 		var name = this.pack + "." + type;
-		haxe.Log.trace(name,{ fileName : "HaxeMarkup.hx", lineNumber : 374, className : "xhx.HaxeMarkup", methodName : "resolveType"});
-		if(this.exports.exists(name)) return this.resolveHref(name,[1]);
+		if(this.exports.exists(name)) return this.resolveHref(name,this.exports.get(name)[0].pos);
 		return null;
 	}
 	,resolveHref: function(module,pos) {

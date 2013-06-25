@@ -217,13 +217,14 @@ edit.Edit.prototype = {
 		while(_g < len) {
 			var i = _g++;
 			var operation = this.operations[i];
-			switch(operation[1]) {
+			var $e = (operation);
+			switch( $e[1] ) {
 			case 0:
-				var string = operation[3], region = operation[2];
+				var string = $e[3], region = $e[2];
 				this.view.erase(null,region);
 				break;
 			case 1:
-				var string = operation[3], region = operation[2];
+				var string = $e[3], region = $e[2];
 				this.view.insert(null,region.begin(),string);
 				break;
 			}
@@ -235,13 +236,14 @@ edit.Edit.prototype = {
 		while(_g < len) {
 			var i = _g++;
 			var operation = this.operations[len - (i + 1)];
-			switch(operation[1]) {
+			var $e = (operation);
+			switch( $e[1] ) {
 			case 0:
-				var string = operation[3], region = operation[2];
+				var string = $e[3], region = $e[2];
 				this.view.insert(null,region.begin(),string);
 				break;
 			case 1:
-				var string = operation[3], region = operation[2];
+				var string = $e[3], region = $e[2];
 				this.view.erase(null,region);
 				break;
 			}
@@ -298,7 +300,7 @@ edit.Editor.prototype = {
 		this.fontCanvas = js.Browser.document.createElement("canvas");
 		var context = this.fontCanvas.getContext("2d");
 		var size = this.fontSize * this.scale | 0;
-		context.font = "" + size + "px Consolas";
+		context.font = "" + size + "px Consolas monospace";
 		this.charWidth = Math.ceil(context.measureText(".").width);
 		this.charHeight = Math.ceil(size);
 		var totalWidth = 127 * this.charWidth;
@@ -306,7 +308,7 @@ edit.Editor.prototype = {
 		this.fontCanvas.height = this.charHeight;
 		context.fillStyle = "white";
 		context.textBaseline = "top";
-		context.font = "" + size + "px Consolas";
+		context.font = "" + size + "px Consolas monospace";
 		var _g = 0;
 		while(_g < 127) {
 			var i = _g++;
@@ -1034,9 +1036,7 @@ edit.command.MoveCommand.prototype = $extend(edit.command.TextCommand.prototype,
 		var index = region.b;
 		switch(args.by) {
 		case "lines":
-			if(!args.extend && region.size() > 0) {
-				if(dir < 0) index = region.begin(); else index = region.end();
-			}
+			if(!args.extend && region.size() > 0) index = dir < 0?region.begin():region.end();
 			var line = this.view.fullLine(index);
 			var col = index - line.a;
 			if(dir > 0) {
@@ -1051,7 +1051,7 @@ edit.command.MoveCommand.prototype = $extend(edit.command.TextCommand.prototype,
 			break;
 		case "characters":
 			if(!args.extend && region.size() > 0) {
-				if(dir < 0) index = region.begin(); else index = region.end();
+				index = dir < 0?region.begin():region.end();
 				dir = 0;
 			}
 			region.b = index + dir;
@@ -1341,7 +1341,7 @@ haxe.Json.prototype = {
 		}
 		var f = Std.parseFloat(HxOverrides.substr(this.str,start,this.pos - start));
 		var i = f | 0;
-		if(i == f) return i; else return f;
+		return i == f?i:f;
 	}
 	,invalidNumber: function(start) {
 		throw "Invalid number at position " + start + ": " + HxOverrides.substr(this.str,start,this.pos - start);

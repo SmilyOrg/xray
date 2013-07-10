@@ -1,0 +1,29 @@
+{
+	"name": "Haxe",
+	"scopeName": "source.haxe",
+	"fileTypes": ["hx"],
+	"patterns":
+	[
+		{
+			"begin": "'",
+			"end": "'",
+			"name": "constant.string.haxe"
+		},
+		{
+			"match": "\\b(if|else|try|catch|function|public|private|static|inline|macro|trace)\\b",
+			"name": "keyword.haxe"
+		},
+		{
+			"match": "\\b(true|false|null)\\b",
+			"name": "constant.haxe"
+		},
+		{
+			"match": "(\\^|>>>|\\-|>>|<<|\\|\\||\\!=|\\*|%|<=|<|\\.\\.\\.|>=|>|==|/|\\||&|\\+=|-=|/=|\\*=|<<=|>>=|>>>=|\\|=|&=|\\^=|=|=>|&&|\\+)",
+			"name": "operator.binop.haxe"
+		},
+		{
+			"match": "(\\!|~|\\-|\\+\\+|\\-\\-)",
+			"name": "operator.unop.haxe"
+		}
+	]
+}

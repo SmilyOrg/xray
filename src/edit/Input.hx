@@ -7,11 +7,11 @@ using Lambda;
 
 class Input
 {
-	var view:Editor;
+	var view:View;
 	var mappings:Array<KeyMapping>;
 	var mouseSelection:Region;
 
-	public function new(view:Editor)
+	public function new(view:View)
 	{
 		this.view = view;
 		this.mappings = [];
@@ -31,7 +31,6 @@ class Input
 		var http = new haxe.Http('keymap-$os.json');
 		http.onData = function(data) {
 			mappings = haxe.Json.parse(data);
-			view.setContent(data);
 		}
 		http.request();
 	}

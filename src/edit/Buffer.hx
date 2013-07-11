@@ -67,4 +67,9 @@ enum BufferFlag
 {
 	Selected;
 	Caret;
+	Syntax1;
+	Syntax2;
+	Syntax3;
+	Syntax4;
+	Syntax5;
 }

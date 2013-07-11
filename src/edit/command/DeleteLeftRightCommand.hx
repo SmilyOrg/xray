@@ -2,7 +2,7 @@ package edit.command;
 
 class DeleteLeftRightCommand extends TextCommand
 {
-	public function new(view:Editor)
+	public function new(view:View)
 	{
 		super(view);
 	}

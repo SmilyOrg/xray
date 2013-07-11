@@ -43,7 +43,8 @@ class Language
 	public function process(source:String)
 	{
 		var ranges = [[0,source.length]];
-		trace(ranges.map(function(r) { return source.substr(r[0], r[1]); }).join("--"));
+		var result = [];
+		// trace(ranges.map(function(r) { return source.substr(r[0], r[1]); }).join("--"));
 		for (pattern in definition.patterns)
 		{
 			var ereg = pattern.match;
@@ -59,7 +60,8 @@ class Language
 					ranges.splice(i, 1);
 
 					var pos = ereg.matchedPos();
-					
+					result.push({region:new Region(pos.pos, pos.pos + pos.len), name:pattern.name});
+
 					var left = [range[0], pos.pos - range[0]];
 					var right = [pos.pos + pos.len, range[1] - (left[1] + pos.len)];
 
@@ -70,13 +72,15 @@ class Language
 						i++;
 					}
 
-					trace(ranges.map(function(r) { return source.substr(r[0], r[1]); }).join("|"));
+					// trace(ranges.map(function(r) { return source.substr(r[0], r[1]); }).join("|"));
 				}
 				else i++;
 
 				if (i > ranges.length - 1) break;
 			}
 		}
+
+		return result;
 	}
 }
 

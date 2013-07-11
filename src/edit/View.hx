@@ -4,9 +4,9 @@ import js.html.ImageData;
 import js.html.CanvasElement;
 import js.html.CanvasRenderingContext2D;
 
-class Editor
+class View
 {
-	static function main() new Editor();
+	static function main() new View();
 
 	public var selection:RegionSet;
 	public var buffer:Buffer;
@@ -31,6 +31,7 @@ class Editor
 
 	var maxScrollX:Int;
 	var maxScrollY:Int;
+	var language:Language;
 
 	public function new()
 	{
@@ -70,6 +71,8 @@ class Editor
 		canvas.width = Std.int(window.innerWidth * scale);
 		canvas.height = Std.int(window.innerHeight * scale);
 
+		language = new Language(haxe.Resource.getString("haxe"));
+
 		var invScale = 1 / scale;
 		untyped canvas.style.webkitTransformOrigin = "top left";
 		untyped canvas.style.webkitTransform = 'scale($invScale,$invScale)';
@@ -82,6 +85,8 @@ class Editor
 
 		setContent("");
 		new Input(this);
+
+		runCommand("load", {url:"Test.hx"});
 	}
 
 	public function beginEdit(?command:String, ?args:Dynamic):Edit
@@ -276,10 +281,12 @@ class Editor
 
 	public function render()
 	{
-		// context.fillStyle = "#272822";
 		context.clearRect(0, 0, canvas.width, canvas.height);
 
-		trace(scrollY);
+		var size = Std.int(fontSize * scale);
+		context.font = '${size}px Consolas';
+		context.textBaseline = "top";
+
 		context.save();
 		context.translate(-scrollX, -scrollY);
 
@@ -290,6 +297,25 @@ class Editor
 		{
 			buffer.setFlag(region, Selected);
 			buffer.setFlagAt(region.b, Caret);
+		}
+
+		var scopes = language.process(buffer.content);
+		for (scope in scopes)
+		{
+			switch (scope.name)
+			{
+				case "string":
+					buffer.setFlag(scope.region, Syntax1);
+				case "keyword", "operator":
+					buffer.setFlag(scope.region, Syntax2);
+				case "constant":
+					buffer.setFlag(scope.region, Syntax3);
+				case "comment":
+					buffer.setFlag(scope.region, Syntax4);
+				case "directive":
+					buffer.setFlag(scope.region, Syntax5);
+				default:
+			}
 		}
 
 		var x = 0;
@@ -303,8 +329,24 @@ class Editor
 
 			if (buffer.hasFlagAt(i, Selected))
 			{
-				context.fillStyle = "orange";
+				context.fillStyle = "#38382f";
 				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
+			}
+
+			if (code != 10 && code != 9)
+			{
+				if (buffer.hasFlagAt(i, Syntax1)) context.fillStyle = "#e7dc6a";
+				else if (buffer.hasFlagAt(i, Syntax2)) context.fillStyle = "#fb2b72";
+				else if (buffer.hasFlagAt(i, Syntax3)) context.fillStyle = "#ae7eff";
+				else if (buffer.hasFlagAt(i, Syntax4)) context.fillStyle = "#757158";
+				else if (buffer.hasFlagAt(i, Syntax5)) context.fillStyle = "#61d8f1";
+				else context.fillStyle = "white";
+
+				context.fillText(String.fromCharCode(code), gutterWidth + x * charWidth, y * charHeight);
+
+				// context.drawImage(fontCanvas, 
+				// 	code * charWidth, 0, charWidth, charHeight,
+				// 	gutterWidth + x * charWidth, y * charHeight, charWidth, charHeight);
 			}
 
 			if (buffer.hasFlagAt(i, Caret))
@@ -312,14 +354,7 @@ class Editor
 				context.fillStyle = "white";
 				context.fillRect(gutterWidth + x * charWidth, y * charHeight, 2, charHeight);
 			}
-
-			if (code != 10 && code != 9)
-			{
-				context.drawImage(fontCanvas, 
-					code * charWidth, 0, charWidth, charHeight,
-					gutterWidth + x * charWidth, y * charHeight, charWidth, charHeight);
-			}
-
+			
 			if (code == 10)
 			{
 				x = 0;

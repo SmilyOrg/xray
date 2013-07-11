@@ -2,10 +2,10 @@ package edit;
 
 class Edit
 {
-	var view:Editor;
+	var view:View;
 	var operations:Array<EditOperation>;
 
-	public function new(view:Editor)
+	public function new(view:View)
 	{
 		this.view = view;
 		this.operations = [];

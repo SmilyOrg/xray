@@ -5,25 +5,32 @@
 	"patterns":
 	[
 		{
-			"begin": "'",
-			"end": "'",
-			"name": "constant.string.haxe"
+			"match": "\".*?\"",
+			"name": "string"
+		},
+		{
+			"match": "//.+",
+			"name": "comment"
+		},
+		{
+			"match": "\\b(class|typedef|abstract|enum|package|import)\\b",
+			"name": "directive"
 		},
 		{
 			"match": "\\b(if|else|try|catch|function|public|private|static|inline|macro|trace)\\b",
-			"name": "keyword.haxe"
+			"name": "keyword"
 		},
 		{
 			"match": "\\b(true|false|null)\\b",
-			"name": "constant.haxe"
+			"name": "constant"
 		},
 		{
 			"match": "(\\^|>>>|\\-|>>|<<|\\|\\||\\!=|\\*|%|<=|<|\\.\\.\\.|>=|>|==|/|\\||&|\\+=|-=|/=|\\*=|<<=|>>=|>>>=|\\|=|&=|\\^=|=|=>|&&|\\+)",
-			"name": "operator.binop.haxe"
+			"name": "operator"
 		},
 		{
 			"match": "(\\!|~|\\-|\\+\\+|\\-\\-)",
-			"name": "operator.unop.haxe"
+			"name": "operator"
 		}
 	]
 }

@@ -1,6 +1,10 @@
 -cmd cp res/* pages
 
--main edit.Editor
+-main edit.View
 -js pages/edit.js
 -cp src
 --macro include('edit')
+-resource res/haxe.json@haxe
+
+# -x edit.LanguageTest
+# -cp src

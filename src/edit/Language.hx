@@ -40,48 +40,114 @@ class Language
 		return json;
 	}
 
-	public function process(source:String)
+	function search(source:String, region:Region):Array<Scope>
 	{
-		var ranges = [[0,source.length]];
-		var result = [];
-		// trace(ranges.map(function(r) { return source.substr(r[0], r[1]); }).join("--"));
+		var regions = [region];
+		var scopes = [];
+
 		for (pattern in definition.patterns)
 		{
-			var ereg = pattern.match;
-			if (ereg == null) ereg = pattern.begin;
-
 			var i = 0;
 			while (true)
 			{
-				var range = ranges[i];
+				var region = regions[i];
 				
-				if (ereg.matchSub(source, range[0], range[1]))
+				if (pattern.match.matchSub(source, region.a, region.b - region.a))
 				{
-					ranges.splice(i, 1);
+					var pos = pattern.match.matchedPos();
+					var match = new Region(pos.pos, pos.pos + pos.len);
+					var left = new Region(region.a, match.a);
+					var right = new Region(match.b, region.b);
 
-					var pos = ereg.matchedPos();
-					result.push({region:new Region(pos.pos, pos.pos + pos.len), name:pattern.name});
+					regions.splice(i, 1);
+					scopes.push({region:match, name:pattern.name});
 
-					var left = [range[0], pos.pos - range[0]];
-					var right = [pos.pos + pos.len, range[1] - (left[1] + pos.len)];
-
-					if (right[1] > 0) ranges.insert(i, right);
-					if (left[1] > 0)
+					if (right.size() > 0)
 					{
-						ranges.insert(i, left);
-						i++;
+						regions.insert(i, right);
 					}
 
-					// trace(ranges.map(function(r) { return source.substr(r[0], r[1]); }).join("|"));
+					if (left.size() > 0)
+					{
+						regions.insert(i, left);
+						i++;
+					}
 				}
 				else i++;
 
-				if (i > ranges.length - 1) break;
+				if (i > regions.length - 1) break;
+			}
+		}
+
+		return scopes;
+	}
+
+	public function process(source:String)
+	{
+		return search(source, new Region(0, source.length));
+
+		var ranges = [[0,source.length]];
+		var result = [];
+
+		for (pattern in definition.patterns)
+		{
+			else
+			{
+				var i = 0;
+				while (true)
+				{
+					var range = ranges[i];
+					
+					if (pattern.begin.matchSub(source, range[0], range[1]))
+					{
+						var pos = pattern.begin.matchedPos();
+						if (pattern.end.matchSub(source, (pos.pos + pos.len), range[1] + ((pos.pos + pos.len) - range[0])))
+						{
+							var pos2 = pattern.end.matchedPos();
+							pos.len = (pos2.pos + pos2.len) - pos.pos;
+
+							for (pattern in pattern.patterns)
+							{
+								while (true)
+								{
+									if (pattern.match.matchSub(source, pos.pos, pos.len))
+									{
+										var subPos = pattern.match.matchedPos();
+										trace(subPos.pos + subPos.len >= pos2.pos && subPos.pos + subPos.len <= pos2.pos + pos2.len);
+										trace(pattern.match.matched(0));
+									}
+								}
+							}
+
+							ranges.splice(i, 1);
+							result.push({region:new Region(pos.pos, pos.pos + pos.len), name:pattern.name});
+
+							var left = [range[0], pos.pos - range[0]];
+							var right = [pos.pos + pos.len, range[1] - (left[1] + pos.len)];
+
+							if (right[1] > 0) ranges.insert(i, right);
+							if (left[1] > 0)
+							{
+								ranges.insert(i, left);
+								i++;
+							}
+						}
+						else i++;
+					}
+					else i++;
+
+					if (i > ranges.length - 1) break;
+				}
 			}
 		}
 
 		return result;
 	}
+}
+
+typedef Scope = {
+	region:Region,
+	name:String
 }
 
 typedef LanguageDef = {
@@ -95,5 +161,6 @@ typedef Pattern = {
 	name:String,
 	match:EReg,
 	begin:EReg,
-	end:EReg
+	end:EReg,
+	patterns:Array<Pattern>
 }

@@ -42,10 +42,10 @@ class Region
 		if (intersects(region))
 		{
 			var a = begin() > region.begin() ? begin() : region.begin();
-			var b = end() > region.end() ? end() : region.end();
+			var b = end() < region.end() ? end() : region.end();
 			return new Region(a, b);
 		}
-		return new Region(0,0);
+		return new Region(0, 0);
 	}
 
 	public function containsPoint(point:Int)
@@ -63,5 +63,22 @@ class Region
 		var a = begin() < region.begin() ? begin() : region.begin();
 		var b = end() > region.end() ? end() : region.end();
 		return new Region(a, b);
+	}
+
+	public function subtract(region:Region)
+	{
+		var size2 = region.size();
+
+		if (region.end() <= begin())
+		{
+			a -= size2;
+			b -= size2;
+		}
+		else if (intersects(region))
+		{
+			var cross = size() - intersection(region).size();
+			a = begin() < region.begin() ? begin() : region.begin();
+			b = a + cross;
+		}
 	}
 }

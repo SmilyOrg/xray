@@ -12,11 +12,12 @@ class View
 	public var buffer:Buffer;
 	public var fontSize:Int;
 	public var edits:Array<Edit>;
-	public var edit:Edit;
 
 	var gutterWidth:Int;
 	var canvas:CanvasElement;
+	var canvas2:CanvasElement;
 	var context:CanvasRenderingContext2D;
+	var context2:CanvasRenderingContext2D;
 	var fontCanvas:CanvasElement;
 
 	var scale:Float;
@@ -33,6 +34,9 @@ class View
 	var maxScrollY:Int;
 	var language:Language;
 
+	var theme:Map<String, Int>;
+	var colors:Map<Int, Int>;
+
 	public function new()
 	{
 		// config
@@ -42,9 +46,6 @@ class View
 		var document = js.Browser.document;
 		var window = js.Browser.window;
 		var body = document.body;
-
-		edit = new Edit(this);
-		edits = [edit];
 
 		// scroll position
 		scrollX = 0;
@@ -63,25 +64,49 @@ class View
 		selection = new RegionSet();
 		selection.add(new Region(0, 0));
 
+		// init edit
+		edits = [];
+
 		// create canvas
 		canvas = document.createCanvasElement();
+		context = canvas.getContext2d();
+		
+		canvas2 = document.createCanvasElement();
+		context2 = canvas2.getContext2d();
+		
 		body.appendChild(canvas);
 
 		// create canvas
-		canvas.width = Std.int(window.innerWidth * scale);
-		canvas.height = Std.int(window.innerHeight * scale);
+		canvas.width = canvas2.width = Std.int(window.innerWidth * scale);
+		canvas.height = canvas2.height = Std.int(window.innerHeight * scale);
+
+		// create theme
+		theme = new Map<String, Int>();
+		theme.set("string", 1);
+		theme.set("keyword", 2);
+		theme.set("operator", 3);
+		theme.set("constant", 4);
+		theme.set("comment", 5);
+		theme.set("directive", 6);
+		theme.set("type", 7);
+		theme.set("special", 8);
+
+		// create colors
+		colors = new Map<Int, Int>();
+		colors.set(1, 0xe7dc6a);
+		colors.set(2, 0xfb2b72);
+		colors.set(3, 0xfb2b72);
+		colors.set(4, 0xae7eff);
+		colors.set(5, 0x757158);
+		colors.set(6, 0x61d8f1);
+		colors.set(7, 0xa6e22e);
+		colors.set(8, 0xd1922e);
 
 		language = new Language(haxe.Resource.getString("haxe"));
 
 		var invScale = 1 / scale;
 		untyped canvas.style.webkitTransformOrigin = "top left";
 		untyped canvas.style.webkitTransform = 'scale($invScale,$invScale)';
-		
-		context = canvas.getContext2d();
-
-		document.addEventListener("paste", paste);
-		document.addEventListener("copy", copy);
-		document.addEventListener("cut", cut);
 
 		setContent("");
 		new Input(this);
@@ -91,17 +116,30 @@ class View
 
 	public function beginEdit(?command:String, ?args:Dynamic):Edit
 	{
-		return new Edit(this);
+		var edit = new Edit(this);
+		edits.unshift(edit);
+		return edit;
 	}
 
 	public function endEdit(edit:Edit)
 	{
-		edits.push(edit);
+		edit.end();
 	}
 
 	public function insert(edit:Edit, point:Int, string:String)
 	{
+		// if (string == " " && edit != null)
+		// {
+		// 	endEdit(edit);
+		// 	this.edit = edit = beginEdit();
+		// }
+
 		if (edit != null) edit.insert(point, string);
+		for (region in selection)
+		{
+			if (point <= region.begin() && point < region.end()) region.a += string.length;
+			if (point < region.end()) region.b += string.length;
+		}
 		buffer.insert(point, 0, string);
 	}
 
@@ -113,7 +151,7 @@ class View
 
 	public function replace(edit:Edit, region:Region, string:String)
 	{
-		erase(edit, region);
+		if (edit != null) erase(edit, region);
 		insert(edit, region.begin(), string);
 	}
 
@@ -125,6 +163,8 @@ class View
 
 	public function runCommand(name:String, ?args:Dynamic)
 	{
+		if (edits.length == 0) beginEdit();
+
 		var className = "edit.command.";
 		for (part in name.split("_"))
 			className += part.charAt(0).toUpperCase() + part.substr(1);
@@ -142,26 +182,7 @@ class View
 		
 		if (args == null) args = {};
 		var command:Dynamic = Type.createInstance(command, [this]);
-		command.run(args);
-	}
-
-	function cut(e)
-	{
-		e.preventDefault();
-		e.clipboardData.setData("text/plain", getRegions(selection));
-		runCommand("insert", {characters:""});
-	}
-
-	function copy(e)
-	{
-		e.preventDefault();
-		e.clipboardData.setData("text/plain", getRegions(selection));
-	}
-
-	function paste(e)
-	{
-		var text = e.clipboardData.getData("text/plain");
-		runCommand("insert", {characters:text});
+		command.run(edits[0], args);
 	}
 
 	function getPosition(index:Int):{col:Int, row:Int}
@@ -210,6 +231,8 @@ class View
 		var col = x / charWidth;
 
 		var line = getLine(row);
+		if (line == null) return size();
+
 		var charCol = 0;
 		var charX = 0;
 		for (i in 0...line.length)
@@ -273,122 +296,52 @@ class View
 
 	public function scroll(x:Int, y:Int)
 	{
+		var oldScrollX = scrollX;
+		var oldScrollY = scrollY;
+
 		scrollX = Std.int(Math.max(0, Math.min(maxScrollX, scrollX - x)));
 		scrollY = Std.int(Math.max(0, Math.min(maxScrollY, scrollY - y)));
 		
-		render();
-	}
+		x = oldScrollX - scrollX;
+		y = oldScrollY - scrollY;
 
-	public function render()
-	{
+		context2.clearRect(0, 0, canvas.width, canvas.height);
+		context2.drawImage(canvas, 0, 0);
 		context.clearRect(0, 0, canvas.width, canvas.height);
+		context.drawImage(canvas2, x, y);
 
-		var size = Std.int(fontSize * scale);
-		context.font = '${size}px Consolas';
-		context.textBaseline = "top";
-
-		context.save();
-		context.translate(-scrollX, -scrollY);
-
-		var selected = new Map<Int, Bool>();
-		var carets = new Map<Int, Bool>();
-		buffer.clearFlags();
-		for (region in selection)
+		if (y > 0)
 		{
-			buffer.setFlag(region, Selected);
-			buffer.setFlagAt(region.b, Caret);
+			var start = getIndex(0, Math.floor(oldScrollY / charHeight));
+			var end = getIndex(0, Math.floor(scrollY / charHeight));
+			renderRegion(line(start).cover(line(end)));
 		}
-
-		var scopes = language.process(buffer.content);
-		for (scope in scopes)
+		else if (y < 0)
 		{
-			switch (scope.name)
-			{
-				case "string":
-					buffer.setFlag(scope.region, Syntax1);
-				case "keyword", "operator":
-					buffer.setFlag(scope.region, Syntax2);
-				case "constant":
-					buffer.setFlag(scope.region, Syntax3);
-				case "comment":
-					buffer.setFlag(scope.region, Syntax4);
-				case "directive":
-					buffer.setFlag(scope.region, Syntax5);
-				default:
-			}
+			var start = getIndex(0, Math.floor((oldScrollY + canvas.height) / charHeight));
+			var end = getIndex(0, Math.floor((scrollY + canvas.height) / charHeight));
+			renderRegion(line(start).cover(line(end)));
 		}
-
-		var x = 0;
-		var y = 0;
-		
-		for (i in 0...buffer.content.length + 1)
-		{
-			var code = buffer.content.charCodeAt(i);
-			var w = 1;
-			if (code == 9) w = (Math.floor(x/4)*4+4) - x;
-
-			if (buffer.hasFlagAt(i, Selected))
-			{
-				context.fillStyle = "#38382f";
-				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
-			}
-
-			if (code != 10 && code != 9)
-			{
-				if (buffer.hasFlagAt(i, Syntax1)) context.fillStyle = "#e7dc6a";
-				else if (buffer.hasFlagAt(i, Syntax2)) context.fillStyle = "#fb2b72";
-				else if (buffer.hasFlagAt(i, Syntax3)) context.fillStyle = "#ae7eff";
-				else if (buffer.hasFlagAt(i, Syntax4)) context.fillStyle = "#757158";
-				else if (buffer.hasFlagAt(i, Syntax5)) context.fillStyle = "#61d8f1";
-				else context.fillStyle = "white";
-
-				context.fillText(String.fromCharCode(code), gutterWidth + x * charWidth, y * charHeight);
-
-				// context.drawImage(fontCanvas, 
-				// 	code * charWidth, 0, charWidth, charHeight,
-				// 	gutterWidth + x * charWidth, y * charHeight, charWidth, charHeight);
-			}
-
-			if (buffer.hasFlagAt(i, Caret))
-			{
-				context.fillStyle = "white";
-				context.fillRect(gutterWidth + x * charWidth, y * charHeight, 2, charHeight);
-			}
-			
-			if (code == 10)
-			{
-				x = 0;
-				y ++;
-			}
-			else
-			{
-				x += w;
-			}
-		}
-
-		maxScrollY = y * charHeight - canvas.height;
-
-		context.restore();
 	}
 
-	function getRegions(regions:RegionSet)
+	public function getRegions(regions:RegionSet)
 	{
 		var text = new StringBuf();
 		for (region in regions) text.add(substr(region));
 		return text.toString();
 	}
 
-	inline public function substr(region:Region)
+	public function substr(region:Region)
 	{
 		return buffer.content.substring(region.begin(), region.end());
 	}
 
-	inline public function char(index:Int)
+	public function char(index:Int)
 	{
 		return buffer.content.charAt(index);
 	}
 	
-	inline public function size()
+	public function size()
 	{
 		return buffer.content.length;
 	}
@@ -416,5 +369,85 @@ class View
 		{
 			context.fillText(String.fromCharCode(i), i * charWidth, 0);
 		}
+	}
+
+	public function render()
+	{
+		context.clearRect(0, 0, canvas.width, canvas.height);
+
+		var size = Std.int(fontSize * scale);
+		context.font = '${size}px Consolas';
+		context.textBaseline = "top";
+
+		var selected = new Map<Int, Bool>();
+		var carets = new Map<Int, Bool>();
+		buffer.clearFlags();
+		for (region in selection)
+		{
+			buffer.setFlag(region, Selected);
+			buffer.setFlagAt(region.b, Caret);
+		}
+		
+		var scopes = language.process(buffer.content);
+		for (scope in scopes)
+		{
+			buffer.setColor(scope.region, theme.get(scope.name));
+		}
+
+		renderRegion(new Region(0, buffer.content.length));
+
+		var lines = buffer.content.split("\n").length;
+		maxScrollY = (lines + 1) * charHeight - canvas.height;
+	}
+
+	function renderRegion(region:Region)
+	{
+		context.save();
+		context.translate(-scrollX, -scrollY);
+
+		var position = getPosition(region.a);
+		
+		var x = position.col;
+		var y = position.row;
+
+		for (i in region.a...region.b)
+		{
+			var code = buffer.content.charCodeAt(i);
+			var w = 1;
+			if (code == 9) w = (Math.floor(x/4)*4+4) - x;
+
+			if (buffer.hasFlagAt(i, Selected))
+			{
+				context.fillStyle = "#38382f";
+				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
+			}
+
+			if (code != 10 && code != 9)
+			{
+				var color = buffer.colors.get(i);
+				if (color == 0) context.fillStyle = "white";
+				else context.fillStyle = "#" + StringTools.hex(colors.get(color));
+
+				context.fillText(String.fromCharCode(code), gutterWidth + x * charWidth, y * charHeight);
+			}
+
+			if (buffer.hasFlagAt(i, Caret))
+			{
+				context.fillStyle = "white";
+				context.fillRect(gutterWidth + x * charWidth, y * charHeight, 2, charHeight);
+			}
+			
+			if (code == 10)
+			{
+				x = 0;
+				y ++;
+			}
+			else
+			{
+				x += w;
+			}
+		}
+
+		context.restore();
 	}
 }

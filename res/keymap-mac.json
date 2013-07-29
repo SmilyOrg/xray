@@ -1,4 +1,7 @@
 [
+	{ "keys":["ctrl+shift+k"], "command":"delete_line" },
+	{ "keys":["super+shift+d"], "command":"duplicate_line" },
+
 	{ "keys":["left"], "command":"move", "args":{ "by":"characters", "forward":false, "extend":false } },
 	{ "keys":["right"], "command":"move", "args":{ "by":"characters", "forward":true, "extend":false } },
 	{ "keys":["up"], "command":"move", "args":{ "by":"lines", "forward":false, "extend":false } },
@@ -92,7 +95,7 @@
 	]},
 
 	{ "keys":["'"], "command":"insert_snippet", "args":{ "contents":"'$0'" }, "context":[
-		{ "key":"preceding_text", "operator":"not_regex_contains", "operand":"['a-zA-Z0-9_]$", "match_all":true }
+		{ "key":"preceding_text", "operator":"not_regex_contains", "operand":"['a-zA-Z0-9_\\\\]$", "match_all":true }
 	]},
 	{ "keys":["'"], "command":"move", "args":{ "by":"characters", "forward":true}, "context":[
 			{ "key":"selection_empty", "operator":"equal", "operand":true, "match_all":true },

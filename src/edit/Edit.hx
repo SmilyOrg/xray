@@ -4,11 +4,14 @@ class Edit
 {
 	var view:View;
 	var operations:Array<EditOperation>;
+	var selectionBefore:RegionSet;
+	var selectionAfter:RegionSet;
 
 	public function new(view:View)
 	{
 		this.view = view;
 		this.operations = [];
+		this.selectionBefore = view.selection.clone();
 	}
 
 	public function insert(point:Int, string:String)
@@ -35,6 +38,7 @@ class Edit
 					view.erase(null, region);
 			}
 		}
+		view.selection = selectionBefore;
 	}
 
 	public function redo()
@@ -51,6 +55,12 @@ class Edit
 					view.insert(null, region.begin(), string);
 			}
 		}
+		view.selection = selectionAfter;
+	}
+
+	public function end()
+	{
+		selectionAfter = view.selection.clone();
 	}
 }
 

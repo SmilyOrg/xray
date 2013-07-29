@@ -7,7 +7,7 @@ class MoveCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		for (region in view.selection) moveRegion(region, args);
 		view.render();

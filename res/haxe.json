@@ -5,15 +5,103 @@
 	"patterns":
 	[
 		{
-			"begins": "\"",
-			"ends": "\"",
-			"match": "\".+?\"",
+			"begin": "\"",
+			"end": "\"",
 			"name": "string",
 			"patterns":
 			[
 				{
-					"name": "escape",
+					"name": "constant",
 					"match": "\\\\."
+				}
+			]
+		},
+		{
+			"begin": "'",
+			"end": "'",
+			"name": "string",
+			"patterns":
+			[
+				{
+					"name": "constant",
+					"match": "\\\\."
+				},
+				{
+					"name": "string",
+					"match": "\\$\\$"
+				},
+				{
+					"name": "source",
+					"begin": "(\\$\\{)",
+					"beginCaptures":
+					{
+						"1": { "name": "string" }
+					},
+					"end": "(\\})",
+					"endCaptures":
+					{
+						"1": { "name": "string" }
+					},
+					"patterns":
+					[
+						
+						{
+							"match": "\\b((0(x|X)[0-9a-fA-F]*)|(([0-9]+\\.?[0-9]*)|(\\.[0-9]+))((e|E)(\\+|-)?[0-9]+)?)\\b",
+							"name": "constant"
+						},
+						{
+							"match": "(\\^|>>>|\\-|>>|<<|\\|\\||\\!=|\\*|%|<=|<|\\.\\.\\.|>=|>|==|/|\\||&|\\+=|-=|/=|\\*=|<<=|>>=|>>>=|\\|=|&=|\\^=|=|=>|&&|\\+)",
+							"name": "operator"
+						},
+						{
+							"match": "(\\!|~|\\-|\\+\\+|\\-\\-)",
+							"name": "operator"
+						},
+						{
+							"match": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+							"name": "type"
+						},
+						{
+							"match": "\\b[a-z_][a-zA-Z0-9_]*\\b",
+							"name": "identifier"
+						}
+					]
+				},
+				{
+					"name": "identifier",
+					"match": "(\\$)[a-zA-Z0-0_]*",
+					"captures":
+					{
+				     	"1": { "name": "string" }
+					}
+				}
+			]
+		},
+		{
+			"name": "string",
+			"begin": "~/",
+			"beginCaptures":
+			{
+				"0": { "name":"keyword" }
+			},
+			"end": "/[gimsu]*",
+			"endCaptures":
+			{
+				"0": { "name":"keyword" }
+			},
+			"patterns":
+			[
+				{
+					"name":"special",
+					"match":"\\\\[wsdWSD]"
+				},
+				{
+					"name":"special",
+					"match":"[\\.\\+\\?\\*]"
+				},
+				{
+					"name":"constant",
+					"match":"\\\\."
 				}
 			]
 		},
@@ -22,11 +110,16 @@
 			"name": "comment"
 		},
 		{
-			"match": "\\b(class|typedef|abstract|enum|package|import|using)\\b",
+			"begin": "/\\*",
+			"end": "\\*/",
+			"name": "comment"
+		},
+		{
+			"match": "\\b(class|typedef|abstract|interface|enum|package|import|using|this)\\b",
 			"name": "directive"
 		},
 		{
-			"match": "\\b(while|return|super|this|new|default|for|case|switch|var|if|else|try|catch|function|public|private|static|override|dynamic|inline|macro|trace)\\b",
+			"match": "\\b(while|return|super|new|default|do|for|case|switch|var|if|else|try|catch|throw|function|public|private|static|override|dynamic|inline|macro|trace|extern|implements|extends|break|continue)\\b",
 			"name": "keyword"
 		},
 		{
@@ -46,12 +139,12 @@
 			"name": "operator"
 		},
 		{
-			"match": "\\b[A-Z][a-zA-Z0-9_]+\\b",
-			"name": "directive"
+			"match": "\\b([a-z0-9]+\\.)*[A-Z][a-zA-Z0-9_]*\\b",
+			"name": "type"
 		},
 		{
-			"match": "\\b[a-zA-Z0-9_]+\\b",
-			"name": "string"
+			"match": "\\b[a-z_][a-zA-Z0-9_]*\\b",
+			"name": "identifier"
 		}
 	]
 }

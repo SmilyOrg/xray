@@ -7,9 +7,13 @@ class UndoCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
-		// view.edit.undo();
-		// view.render();
+		if (view.edits.length > 0)
+		{
+			var edit = view.edits.shift();
+			edit.undo();
+			view.render();
+		}
 	}
 }

@@ -58,4 +58,11 @@ class RegionSet
 	{
 		return get(regions.length - 1);
 	}
+
+	public function clone()
+	{
+		var set = new RegionSet();
+		for (region in regions) set.add(new Region(region.a, region.b));
+		return set;
+	}
 }

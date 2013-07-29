@@ -7,7 +7,7 @@ class InsertSnippetCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		var ereg = ~/\$\d/g;
 		var contents:String = args.contents;

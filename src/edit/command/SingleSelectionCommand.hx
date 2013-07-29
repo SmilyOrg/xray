@@ -7,7 +7,7 @@ class SingleSelectionCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		var first = view.selection.get(0);
 		view.selection.clear();

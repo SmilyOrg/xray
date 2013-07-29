@@ -7,7 +7,7 @@ class DeleteLeftRightCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		view.runCommand("left_delete", {});
 		view.runCommand("right_delete", {});

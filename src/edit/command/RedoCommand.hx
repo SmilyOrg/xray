@@ -7,9 +7,7 @@ class RedoCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
-		// view.edit.redo();
-		// view.render();
 	}
 }

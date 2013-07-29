@@ -40,8 +40,9 @@ class Language
 		return json;
 	}
 
-	function search(source:String, region:Region):Array<Scope>
+	public function process(source:String):Array<Scope>
 	{
+		var region = new Region(0, source.length);
 		var regions = [region];
 		var scopes = [];
 
@@ -51,16 +52,14 @@ class Language
 			while (true)
 			{
 				var region = regions[i];
+				var match = search(source, region, pattern, scopes);
 				
-				if (pattern.match.matchSub(source, region.a, region.b - region.a))
+				if (match != null)
 				{
-					var pos = pattern.match.matchedPos();
-					var match = new Region(pos.pos, pos.pos + pos.len);
 					var left = new Region(region.a, match.a);
 					var right = new Region(match.b, region.b);
 
 					regions.splice(i, 1);
-					scopes.push({region:match, name:pattern.name});
 
 					if (right.size() > 0)
 					{
@@ -79,69 +78,116 @@ class Language
 			}
 		}
 
+		scopes.reverse();
 		return scopes;
 	}
 
-	public function process(source:String)
+	public function search(source:String, region:Region, pattern:Pattern, scopes:Array<Scope>):Region
 	{
-		return search(source, new Region(0, source.length));
+		return if (pattern.match != null) searchMatch(source, region, pattern, scopes);
+		else searchRange(source, region, pattern, scopes);
+	}
 
-		var ranges = [[0,source.length]];
-		var result = [];
+	public function searchMatch(source:String, region:Region, pattern:Pattern, scopes:Array<Scope>):Region
+	{
+		if (!pattern.match.matchSub(source, region.a, region.b - region.a)) return null;
 
-		for (pattern in definition.patterns)
+		var matchPos = pattern.match.matchedPos();
+		var matchRegion = new Region(matchPos.pos, matchPos.pos + matchPos.len);
+		var matchScope = {region:matchRegion, name:pattern.name};
+		
+		if (pattern.captures != null)
+			processCaptures(matchRegion, pattern.captures, pattern.match, scopes);
+		scopes.push(matchScope);
+
+		return matchRegion;
+	}
+
+	public function searchRange(source:String, region:Region, pattern:Pattern, scopes:Array<Scope>):Region
+	{
+		if (!pattern.begin.matchSub(source, region.a, region.b - region.a)) return null;
+		
+		var beginPos = pattern.begin.matchedPos();
+		var range = new Region(beginPos.pos, beginPos.pos + beginPos.len);
+
+		var end = pattern.end;
+		if (!end.matchSub(source, range.b, region.b - range.b)) return null;
+		var endPos = end.matchedPos();
+		
+		range.b = endPos.pos + endPos.len;
+		var regions = [range];
+		var subScopes = [];
+
+		if (pattern.patterns != null)
 		{
-			else
+			for (pattern in pattern.patterns)
 			{
 				var i = 0;
 				while (true)
 				{
-					var range = ranges[i];
+					var subRegion = regions[i];
+					var match = search(source, subRegion, pattern, scopes);
 					
-					if (pattern.begin.matchSub(source, range[0], range[1]))
+					if (match != null)
 					{
-						var pos = pattern.begin.matchedPos();
-						if (pattern.end.matchSub(source, (pos.pos + pos.len), range[1] + ((pos.pos + pos.len) - range[0])))
+						if (match.b == range.b)
 						{
-							var pos2 = pattern.end.matchedPos();
-							pos.len = (pos2.pos + pos2.len) - pos.pos;
-
-							for (pattern in pattern.patterns)
-							{
-								while (true)
-								{
-									if (pattern.match.matchSub(source, pos.pos, pos.len))
-									{
-										var subPos = pattern.match.matchedPos();
-										trace(subPos.pos + subPos.len >= pos2.pos && subPos.pos + subPos.len <= pos2.pos + pos2.len);
-										trace(pattern.match.matched(0));
-									}
-								}
-							}
-
-							ranges.splice(i, 1);
-							result.push({region:new Region(pos.pos, pos.pos + pos.len), name:pattern.name});
-
-							var left = [range[0], pos.pos - range[0]];
-							var right = [pos.pos + pos.len, range[1] - (left[1] + pos.len)];
-
-							if (right[1] > 0) ranges.insert(i, right);
-							if (left[1] > 0)
-							{
-								ranges.insert(i, left);
-								i++;
-							}
+							if (!end.matchSub(source, range.b, subRegion.b - region.b)) return null;
+							endPos = end.matchedPos();
+							var newEnd = endPos.pos + endPos.len;
+							regions.push(new Region(range.b, newEnd));
+							range.b = newEnd;
 						}
-						else i++;
+
+						var left = new Region(subRegion.a, match.a);
+						var right = new Region(match.b, subRegion.b);
+
+						regions.splice(i, 1);
+						subScopes.push({region:match, name:pattern.name});
+
+						if (right.size() > 0)
+						{
+							regions.insert(i, right);
+						}
+
+						if (left.size() > 0)
+						{
+							regions.insert(i, left);
+							i++;
+						}
 					}
 					else i++;
 
-					if (i > ranges.length - 1) break;
+					if (i > regions.length - 1) break;
 				}
 			}
 		}
 
-		return result;
+		if (pattern.beginCaptures != null)
+			processCaptures(range, pattern.beginCaptures, pattern.begin, scopes);
+		if (pattern.endCaptures != null)
+			processCaptures(range, pattern.endCaptures, pattern.end, scopes);
+		scopes.push({region:range, name:pattern.name});
+
+		return range;
+	}
+
+	function processCaptures(region:Region, captures:Dynamic, match:EReg, scopes:Array<Scope>)
+	{
+		for (field in captures.fields())
+		{
+			var capture = captures.field(field);
+			var group = Std.parseInt(field);
+			var string = match.matched(group);
+			var index = match.matchedPos().pos + match.matched(0).indexOf(string);
+
+			var captureRegion = new Region(index, index + string.length);
+			var captureScope = {region:captureRegion, name:capture.name};
+			
+			// if (captureRegion.a == region.a) region.a = captureRegion.b;
+			// if (captureRegion.b == region.b) region.b = captureRegion.a;
+			scopes.push(captureScope);
+		}
 	}
 }
 
@@ -161,6 +207,9 @@ typedef Pattern = {
 	name:String,
 	match:EReg,
 	begin:EReg,
+	beginCaptures:Dynamic,
 	end:EReg,
-	patterns:Array<Pattern>
+	endCaptures:Dynamic,
+	patterns:Array<Pattern>,
+	captures:Dynamic
 }

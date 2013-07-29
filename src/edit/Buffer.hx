@@ -5,28 +5,38 @@ import haxe.EnumFlags;
 
 class Buffer
 {
-	public var flags:Bytes;
 	public var content:String;
+	public var flags:Bytes;
+	public var colors:Bytes;
+
+	var buffers:Array<Bytes>;
 
 	public function new(content:String)
 	{
 		this.content = content;
-		this.flags = Bytes.alloc(content.length);
+		this.flags = Bytes.alloc(1024);
+		this.colors = Bytes.alloc(1024);
+
+		buffers = [flags, colors];
 	}
 
 	public function clearFlags()
 	{
-		flags = Bytes.alloc(content.length);
+		flags = Bytes.alloc(1024);
+		colors = Bytes.alloc(1024);
 	}
 
 	public function insert(index:Int, length:Int, string:String)
 	{
 		content = content.substr(0, index) + string + content.substr(index + length);
-		var previous = flags;
-		flags = Bytes.alloc(content.length);
-		flags.blit(0, previous, 0, index);
-		var pos = index + length;
-		flags.blit(0, previous, pos, previous.length - pos);
+		for (buffer in buffers)
+		{
+			var previous = buffer;
+			// buffer = Bytes.alloc(content.length);
+			buffer.blit(0, previous, 0, index);
+			var pos = index + length;
+			buffer.blit(0, previous, pos, previous.length - pos);
+		}
 	}
 
 	public function replace(region:Region, text:String)
@@ -37,6 +47,11 @@ class Buffer
 	public function setFlag(region:Region, flag:BufferFlag)
 	{
 		for (i in region.begin()...region.end()) setFlagAt(i, flag);
+	}
+
+	public function setColor(region:Region, color:Int)
+	{
+		for (i in region.begin()...region.end()) colors.set(i, color);
 	}
 
 	public function setFlagAt(index:Int, flag:BufferFlag)
@@ -67,9 +82,4 @@ enum BufferFlag
 {
 	Selected;
 	Caret;
-	Syntax1;
-	Syntax2;
-	Syntax3;
-	Syntax4;
-	Syntax5;
 }

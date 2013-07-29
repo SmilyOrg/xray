@@ -16,7 +16,8 @@ class Input
 		this.view = view;
 		this.mappings = [];
 
-		var body = js.Browser.document.body;
+		var document = js.Browser.document;
+		var body = document.body;
 		
 		body.addEventListener("keydown", keyDown);
 		body.addEventListener("keypress", keyPress);
@@ -26,6 +27,10 @@ class Input
 		body.addEventListener("mousewheel", mouseWheel);
 		body.addEventListener("scroll", scroll);
 
+		document.addEventListener("paste", paste);
+		document.addEventListener("copy", copy);
+		document.addEventListener("cut", cut);
+
 		var platform = js.Browser.window.navigator.platform;
 		var os = platform.indexOf("Mac") > -1 ? "mac" : "win";
 		var http = new haxe.Http('keymap-$os.json');
@@ -33,6 +38,25 @@ class Input
 			mappings = haxe.Json.parse(data);
 		}
 		http.request();
+	}
+
+	function cut(e)
+	{
+		e.preventDefault();
+		e.clipboardData.setData("text/plain", view.getRegions(view.selection));
+		view.runCommand("insert", {characters:""});
+	}
+
+	function copy(e)
+	{
+		e.preventDefault();
+		e.clipboardData.setData("text/plain", view.getRegions(view.selection));
+	}
+
+	function paste(e)
+	{
+		var text = e.clipboardData.getData("text/plain");
+		view.runCommand("insert", {characters:text});
 	}
 
 	function scroll(e)
@@ -126,6 +150,11 @@ class Input
 		if (code == 13) code  = 10;
 		
 		var char = String.fromCharCode(code == 190 ? 46 : code);
+		if (char == " " || char == "\n")
+		{
+			view.endEdit(view.edits[0]);
+			view.beginEdit();
+		}
 		view.runCommand("insert", {characters:char});
 	}
 

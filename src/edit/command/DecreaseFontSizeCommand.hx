@@ -7,7 +7,7 @@ class DecreaseFontSizeCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		if (view.fontSize <= 6) return;
 		view.fontSize -= 1;

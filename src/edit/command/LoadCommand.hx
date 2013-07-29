@@ -7,7 +7,7 @@ class LoadCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		var http = new haxe.Http(args.url);
 		http.onData = function(data:String) view.setContent(data); 

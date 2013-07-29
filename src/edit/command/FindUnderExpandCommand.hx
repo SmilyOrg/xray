@@ -7,7 +7,7 @@ class FindUnderExpandCommand extends TextCommand
 		super(view);
 	}
 
-	public function run(args:Dynamic)
+	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		var last = view.selection.last();
 		var term = view.substr(last);

@@ -5,6 +5,15 @@
 	"patterns":
 	[
 		{
+			"match": "//.*",
+			"name": "comment"
+		},
+		{
+			"begin": "/\\*",
+			"end": "\\*/",
+			"name": "comment"
+		},
+		{
 			"begin": "\"",
 			"end": "\"",
 			"name": "string",
@@ -104,15 +113,6 @@
 					"match":"\\\\."
 				}
 			]
-		},
-		{
-			"match": "//.*",
-			"name": "comment"
-		},
-		{
-			"begin": "/\\*",
-			"end": "\\*/",
-			"name": "comment"
 		},
 		{
 			"match": "\\b(class|typedef|abstract|interface|enum|package|import|using|this)\\b",

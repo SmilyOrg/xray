@@ -11,7 +11,6 @@ class MoveCommand extends TextCommand
 	{
 		for (region in view.selection) moveRegion(region, args);
 		view.render();
-		// trace("word: >" + view.substr(view.word(view.selection.get(0).b)) + "<");
 	}
 
 	function moveRegion(region:Region, args:Dynamic)

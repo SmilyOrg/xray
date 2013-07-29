@@ -137,7 +137,7 @@ class View
 		if (edit != null) edit.insert(point, string);
 		for (region in selection)
 		{
-			if (point <= region.begin() && point < region.end()) region.a += string.length;
+			if (point <= region.begin()) region.a += string.length;
 			if (point < region.end()) region.b += string.length;
 		}
 		buffer.insert(point, 0, string);
@@ -147,6 +147,7 @@ class View
 	{
 		if (edit != null) edit.erase(region);
 		buffer.insert(region.begin(), region.size(), "");
+		for (r in selection) r.subtract(region);
 	}
 
 	public function replace(edit:Edit, region:Region, string:String)

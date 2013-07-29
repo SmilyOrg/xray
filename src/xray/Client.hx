@@ -1,12 +1,13 @@
 package xray;
 
 import haxe.macro.Type;
-
 import js.html.InputElement;
 using xray.TypeTools;
 using xray.Data;
 using Lambda;
 using StringTools;
+
+typedef TypeExports = Map<String, Array<{name:String, pos:Array<Int>}>>;
 
 @:expose('client') class Client
 {
@@ -21,7 +22,8 @@ using StringTools;
 	var sources:Array<SourceFile>;
 	var files:Map<String, String>;
 	var output:js.html.DivElement;
-	var export:Map<String, Array<String>>;
+	var export:TypeExports;
+	var styles:js.html.StyleElement;
 
 	function new()
 	{
@@ -30,6 +32,7 @@ using StringTools;
 		var window = js.Browser.window;
 		window.addEventListener("hashchange", updateLocation);
 
+		styles = cast js.Browser.document.getElementById("dynamicStylesheet");
 		output = cast js.Browser.document.getElementById("results");
 		loadSources();
 	}
@@ -48,6 +51,19 @@ using StringTools;
 
 		sources = haxe.Unserializer.run(data);
 		loadExport();
+	}
+
+	function clearLines()
+	{
+		if (styles.firstChild != null) styles.removeChild(styles.firstChild);
+	}
+
+	function highlightLines(min:Int, max:Int)
+	{
+		var lines = "";
+		for (i in min...max + 1) lines += '#L$i { background: #444; } ';
+		styles.appendChild(js.Browser.document.createTextNode(lines));
+		trace(min + ":" + max);
 	}
 
 	function loadExport()
@@ -72,8 +88,26 @@ using StringTools;
 		showPath(file);
 	}
 
+	var line:Int;
+
 	function showPath(url:String)
 	{
+		clearLines();
+		
+		var parts = url.split(":");
+		line = -1;
+		if (parts.length > 1)
+		{
+			url = parts[0];
+			var lines = parts[1].split("-");
+
+			var min = Std.parseInt(lines[0]);
+			var max = lines.length > 1 ? Std.parseInt(lines[1]) : min;
+			highlightLines(min, max);
+
+			line = min;
+		}
+
 		var matches = [];
 
 		for (source in sources)
@@ -108,6 +142,8 @@ using StringTools;
 		}
 
 		output.innerHTML = xhx.HaxeMarkup.markup(files.get(url), url, export);
+		if (line > -1) js.Browser.document.getElementById("L" + line).scrollIntoView();
+		else js.Browser.document.getElementById("L1").scrollIntoView();
 	}
 
 	function loadSource(url:String)

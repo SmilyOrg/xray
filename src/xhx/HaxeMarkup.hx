@@ -6,6 +6,8 @@ import hxparse.LexerStream;
 import haxe.macro.Expr;
 using Lambda;
 
+typedef TypeExports = Map<String, Array<{name:String, pos:Array<Int>}>>;
+
 class HaxeMarkup
 {
 	public inline static var DIRECTIVE = "directive";
@@ -17,7 +19,7 @@ class HaxeMarkup
 	public inline static var MACRO = "macro";
 	public inline static var TYPE = "type";
 
-	public static function markup(source:String, file:String, exports:Map<String, Array<String>>)
+	public static function markup(source:String, file:String, exports:TypeExports)
 	{
 		if (source == "" || source == null) return "";
 		var parser = new HaxeMarkup(source, file, exports);
@@ -48,13 +50,13 @@ class HaxeMarkup
 	var stream:LexerStream<Token>;
 	var stack:Array<Bool>;
 	var pad:Int;
-	var exports:Map<String, Array<String>>;
+	var exports:TypeExports;
 	
 	var module:String;
 	var pack:String;
 	var name:String;
 
-	public function new(source:String, file:String, exports:Map<String, Array<String>>)
+	public function new(source:String, file:String, exports:TypeExports)
 	{
 		this.exports = exports;
 		this.active = true;
@@ -96,12 +98,14 @@ class HaxeMarkup
 		}
 		else
 		{
+			var line = '</span>\n<span class="$span">';
+			str = str.split("\n").join(line);
+
 			if (span == TYPE)
 			{
-				var module = resolveType(str);
-				if (module != null)
+				var href = resolveType(str);
+				if (href != null)
 				{
-					var href = "#/" + module.split(".").join("/") + ".hx";
 					buf.add('<a href="$href"><span class="$span">$str</span></a>');
 				}
 				else
@@ -151,7 +155,7 @@ class HaxeMarkup
 							val = val && parseMacro();
 						case Binop(OpBoolOr):
 							add(token, MACRO);
-							val = val || parseMacro();
+							val = parseMacro() || val;
 						case PClose:
 							add(token, MACRO);
 							break;
@@ -305,31 +309,38 @@ class HaxeMarkup
 		}
 
 		var pad = 4;
-		var l = 0;
+		var l = 1;
 		var lines = buf.toString().split("\n");
 		buf = new StringBuf();
 		for (line in lines)
 		{
-			var num = StringTools.lpad(Std.string(l++), " ", pad);
+			var num = StringTools.lpad(Std.string(l), " ", pad);
 			num = '<span class="num">$num</span>';
-			buf.add(num + " " + line + "\n");
+			buf.add('<span id="L$l">' + num + " " + line + "</span>\n");
+			l += 1;
 		}
 		
 		return buf.toString();
 	}
 
+	function resolveHref(module:String, pos:Array<Int>)
+	{
+		return "#/" + module.split(".").join("/") + ".hx:" + pos.join("-");
+	}
+
 	function resolveType(type:String)
 	{
-		if (type == name) return module;
+		if (type == name) return resolveHref(module, exports.get(module)[0].pos);
 
 		// current module
 		if (exports.exists(module))
 		{
-			var exported = exports.get(module);
-			if (exported.has(type))
+			for (export in exports.get(module))
 			{
-				trace('Found $type in this module');
-				return module;
+				if (export.name == type)
+				{
+					return resolveHref(module, export.pos);
+				}
 			}
 		}
 
@@ -338,34 +349,36 @@ class HaxeMarkup
 		{
 			if (!exports.exists(i))
 			{
-				trace('No export for import $i');
+				// trace('No export for import $i');
 				return null;
 			}
 
-			var exported = exports.get(i);
-			if (exported.has(type))
+			for (export in exports.get(i))
 			{
-				trace('Found $type in $i');
-				return i;
+				if (export.name == type)
+				{
+					return resolveHref(i, export.pos);
+				}
 			}
 		}
 
 		// top level or fully qualified
 		if (exports.exists(type))
 		{
-			trace('Found $type in top level');
-			return type;
+			// trace('Found $type in top level');
+			return resolveHref(type, exports.get(type)[0].pos);
 		}
 
 		// package
 		var name = pack + "." + type;
+		
 		if (exports.exists(name))
 		{
-			trace('Found $type in current package');
-			return name;
+			// trace('Found $type in current package');
+			return resolveHref(name, exports.get(name)[0].pos);
 		}
 
-		trace('couldn\'t find $type');
+		// trace('couldn\'t find $type');
 		return null;
 	}
 }

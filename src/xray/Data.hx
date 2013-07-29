@@ -71,3 +71,23 @@ class PathData
 		_key = key;
 	}
 }
+
+typedef ModuleInfo =
+{
+	var pack:Array<String>;
+	var name:String;
+	var types:Array<TypeInfo>;
+}
+
+typedef TypeInfo =
+{
+	var name:String;
+	var fields:Array<FieldInfo>;
+	var pos:String;
+}
+
+typedef FieldInfo =
+{
+	var name:String;
+	var pos:String;
+}

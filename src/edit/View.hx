@@ -12,6 +12,9 @@ class View
 	public var buffer:Buffer;
 	public var fontSize:Int;
 	public var edits:Array<Edit>;
+	
+	public var fields:Array<RegionSet>;
+	public var currentField:Int;
 
 	var gutterWidth:Int;
 	var canvas:CanvasElement;
@@ -39,6 +42,9 @@ class View
 
 	public function new()
 	{
+		fields = [];
+		currentField = 0;
+		
 		// config
 		fontSize = 16;
 		gutterWidth = 30;
@@ -128,31 +134,25 @@ class View
 
 	public function insert(edit:Edit, point:Int, string:String)
 	{
-		// if (string == " " && edit != null)
-		// {
-		// 	endEdit(edit);
-		// 	this.edit = edit = beginEdit();
-		// }
-
 		if (edit != null) edit.insert(point, string);
-		for (region in selection)
-		{
-			if (point <= region.begin()) region.a += string.length;
-			if (point < region.end()) region.b += string.length;
-		}
+		selection.insert(point, string.length);
+		for (field in fields) field.insert(point, string.length);
 		buffer.insert(point, 0, string);
 	}
 
 	public function erase(edit:Edit, region:Region)
 	{
+		region = region.clone();
+
 		if (edit != null) edit.erase(region);
 		buffer.insert(region.begin(), region.size(), "");
-		for (r in selection) r.subtract(region);
+		selection.subtract(region);
+		for (field in fields) field.subtract(region);
 	}
 
 	public function replace(edit:Edit, region:Region, string:String)
 	{
-		if (edit != null) erase(edit, region);
+		erase(edit, region);
 		insert(edit, region.begin(), string);
 	}
 
@@ -389,6 +389,14 @@ class View
 			buffer.setFlagAt(region.b, Caret);
 		}
 		
+		for (field in fields)
+		{
+			for (region in field)
+			{
+				buffer.setFlag(region, Test);
+			}
+		}
+
 		var scopes = language.process(buffer.content);
 		for (scope in scopes)
 		{
@@ -420,6 +428,12 @@ class View
 			if (buffer.hasFlagAt(i, Selected))
 			{
 				context.fillStyle = "#38382f";
+				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
+			}
+
+			if (buffer.hasFlagAt(i, Test))
+			{
+				context.fillStyle = "#f00";
 				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
 			}
 

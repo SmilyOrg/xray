@@ -65,4 +65,14 @@ class RegionSet
 		for (region in regions) set.add(new Region(region.a, region.b));
 		return set;
 	}
+
+	public function insert(point:Int, length:Int)
+	{
+		for (r in this) r.insert(point, length);
+	}
+
+	public function subtract(region:Region)
+	{
+		for (r in this) r.subtract(region);
+	}
 }

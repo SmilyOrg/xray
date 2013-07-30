@@ -65,6 +65,12 @@ class Region
 		return new Region(a, b);
 	}
 
+	public function insert(point:Int, length:Int)
+	{
+		if (point <= a) a += length;
+		if (point <= b) b += length;
+	}
+
 	public function subtract(region:Region)
 	{
 		var size2 = region.size();
@@ -80,5 +86,10 @@ class Region
 			a = begin() < region.begin() ? begin() : region.begin();
 			b = a + cross;
 		}
+	}
+
+	public function clone()
+	{
+		return new Region(a, b);
 	}
 }

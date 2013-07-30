@@ -82,4 +82,5 @@ enum BufferFlag
 {
 	Selected;
 	Caret;
+	Test;
 }

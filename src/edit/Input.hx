@@ -108,6 +108,10 @@ class Input
 								view.substr(region);
 							case "num_selections":
 								view.selection.count();
+							case "has_prev_field":
+								view.currentField > 0;
+							case "has_next_field":
+								view.currentField < view.fields.length - 1;
 							default:
 								null;
 						}

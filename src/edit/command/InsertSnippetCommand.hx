@@ -9,16 +9,13 @@ class InsertSnippetCommand extends TextCommand
 
 	public function run(edit:edit.Edit, args:Dynamic)
 	{
-		var stops = ~/\$(?:\{(\d):(.+?)\}|(\d))/;
+		var stops = ~/\$(?:\{(\d):(.+?)\}|(\d))/g;
 		var vars = ~/\$([A-Z_]+)/;
-
 		var contents:String = args.contents;
 		
-		// var size = characters.length;
-		// var index = size;
-		// if (ereg.match(contents)) index = ereg.matchedPos().pos;
-		
-		// var offset = 0;
+		var fields = [];
+		var regionIndex = 0;
+
 		for (region in view.selection)
 		{
 			var chars = contents;
@@ -31,29 +28,39 @@ class InsertSnippetCommand extends TextCommand
 					default: ereg.matched(0);
 				}
 			});
-
-			var pos = region.begin();
+			
+			var offset = 0;
 			var a = 0;
 			var b = 0;
 
 			// find tab stop regions
 			chars = stops.map(chars, function(ereg){
-				a = b = region.begin() + ereg.matchedPos().pos;
+				var index = Std.parseInt(ereg.matched(1)) - 1;
+				if (index == -1) index = fields.length;
+				if (fields[index] == null) fields.insert(index, new RegionSet());
+				var field = fields[index];
+
+				a = b = (region.begin() + ereg.matchedPos().pos) - offset;
 				if (ereg.matched(2) != null)
 				{
 					b += ereg.matched(2).length;
+					field.add(new Region(a, b));
+					offset += 5;
 					return ereg.matched(2);
 				}
+				field.add(new Region(a, b));
 				return "";
 			});
-			trace(">"+chars);
-			if (region.size() > 0) view.erase(edit, region);
-			view.insert(edit, pos, chars);
 			
-			region.a = a;
-			region.b = b;
+			view.replace(edit, region, chars);
+			
+			region.a = fields[0].get(regionIndex).a;
+			region.b = fields[0].get(regionIndex).b;
+			regionIndex += 1;
 		}
 
+		view.fields = fields;
+		view.currentField = 0;
 		view.render();
 	}
 }

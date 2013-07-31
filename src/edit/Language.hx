@@ -51,6 +51,7 @@ class Language
 			var i = 0;
 			while (true)
 			{
+				if (i > regions.length - 1) break;
 				var region = regions[i];
 				var match = search(source, region, pattern, scopes);
 				
@@ -73,8 +74,6 @@ class Language
 					}
 				}
 				else i++;
-
-				if (i > regions.length - 1) break;
 			}
 		}
 

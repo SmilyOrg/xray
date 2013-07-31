@@ -12,5 +12,11 @@ class NextFieldCommand extends TextCommand
 		view.currentField += 1;
 		view.selection = view.fields[view.currentField].clone();
 		view.render();
+		
+		if (view.currentField == view.fields.length - 1)
+		{
+			view.fields = [];
+			view.currentField = 0;
+		}
 	}
 }

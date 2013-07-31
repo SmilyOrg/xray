@@ -31,7 +31,9 @@ class InsertSnippetCommand extends TextCommand
 
 			// find tab stop regions
 			chars = stops.map(chars, function(ereg){
-				var index = Std.parseInt(ereg.matched(1));
+				var num = ereg.matched(1);
+				if (num == null) num = ereg.matched(3);
+				var index = Std.parseInt(num);
 				if (fields[index] == null) fields[index] = new RegionSet();
 				var field = fields[index];
 
@@ -55,8 +57,6 @@ class InsertSnippetCommand extends TextCommand
 			}
 			
 			view.replace(edit, region, chars);
-			// region.a = fields[0].get(regionIndex).a;
-			// region.b = fields[0].get(regionIndex).b;
 			regionIndex += 1;
 		}
 

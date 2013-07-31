@@ -47,7 +47,7 @@ class View
 		
 		// config
 		fontSize = 16;
-		gutterWidth = 30;
+		gutterWidth = 100;
 
 		var document = js.Browser.document;
 		var window = js.Browser.window;
@@ -403,10 +403,11 @@ class View
 			buffer.setColor(scope.region, theme.get(scope.name));
 		}
 
-		renderRegion(new Region(0, buffer.content.length));
-
 		var lines = buffer.content.split("\n").length;
-		maxScrollY = (lines + 1) * charHeight - canvas.height;
+		maxScrollY = lines * charHeight - canvas.height;
+
+		gutterWidth = (Std.string(lines).length + 3) * charWidth;
+		renderRegion(new Region(0, buffer.content.length));
 	}
 
 	function renderRegion(region:Region)
@@ -419,11 +420,20 @@ class View
 		var x = position.col;
 		var y = position.row;
 
-		for (i in region.a...region.b)
+		for (i in region.a...region.b+1)
 		{
 			var code = buffer.content.charCodeAt(i);
 			var w = 1;
 			if (code == 9) w = (Math.floor(x/4)*4+4) - x;
+
+			if (x == 0)
+			{
+				var num = Std.string(y + 1);
+				context.fillStyle = "#8f908a";
+				context.fillText(num, gutterWidth - ((num.length + 2) * charWidth), y * charHeight);
+			}
+
+			context.clearRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
 
 			if (buffer.hasFlagAt(i, Selected))
 			{

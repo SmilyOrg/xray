@@ -23,7 +23,6 @@ class Foo extends Foo implements Foo
 	{
 		this.foo = 10;
 	}
-
 }
 
 interface Foo implements Foo
@@ -41,6 +40,45 @@ abstract Foo(String)
 {
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

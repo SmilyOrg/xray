@@ -10,7 +10,7 @@ class InsertSnippetCommand extends TextCommand
 	public function run(edit:edit.Edit, args:Dynamic)
 	{
 		var stops = ~/\$(?:\{(\d):(.+?)\}|(\d))/g;
-		var vars = ~/\$([A-Z_]+)/;
+		var vars = ~/\$[A-Z_]+/;
 		var contents:String = args.contents;
 		
 		var fields = [];
@@ -22,11 +22,7 @@ class InsertSnippetCommand extends TextCommand
 
 			// replace vars in snippet
 			chars = vars.map(chars, function(ereg){
-				return switch (ereg.matched(1))
-				{
-					case "SELECTION": view.substr(region);
-					default: ereg.matched(0);
-				}
+				return getVariable(ereg.matched(0), region);
 			});
 			
 			var offset = 0;
@@ -35,9 +31,8 @@ class InsertSnippetCommand extends TextCommand
 
 			// find tab stop regions
 			chars = stops.map(chars, function(ereg){
-				var index = Std.parseInt(ereg.matched(1)) - 1;
-				if (index == -1) index = fields.length;
-				if (fields[index] == null) fields.insert(index, new RegionSet());
+				var index = Std.parseInt(ereg.matched(1));
+				if (fields[index] == null) fields[index] = new RegionSet();
 				var field = fields[index];
 
 				a = b = (region.begin() + ereg.matchedPos().pos) - offset;
@@ -51,16 +46,42 @@ class InsertSnippetCommand extends TextCommand
 				field.add(new Region(a, b));
 				return "";
 			});
+
+			if (fields[0] == null) fields[0] = new RegionSet();
+			if (fields[0].get(regionIndex) == null)
+			{
+				var exit = region.a + chars.length;
+				fields[0].add(new Region(exit, exit));
+			}
 			
 			view.replace(edit, region, chars);
-			
-			region.a = fields[0].get(regionIndex).a;
-			region.b = fields[0].get(regionIndex).b;
+			// region.a = fields[0].get(regionIndex).a;
+			// region.b = fields[0].get(regionIndex).b;
 			regionIndex += 1;
 		}
 
+		if (fields.length > 1) fields.push(fields.shift());
 		view.fields = fields;
+		view.selection = fields[0].clone();
 		view.currentField = 0;
 		view.render();
+	}
+
+	function getVariable(name:String, region:Region):String
+	{
+		return switch (name)
+		{
+			case "$SELECTION", "$SELECTED_TEXT": view.substr(region);
+			case "$CURRENT_LINE": view.substr(view.line(region.b));
+			case "$CURRENT_WORD": view.substr(view.word(region.b));
+			case "$FILENAME": "Todo.hx";
+			case "$FILEPATH": "/ws/project/src/Todo.hx";
+			case "$FULLNAME": "David Peek";
+			case "$LINE_INDEX": Std.string(view.getPosition(region.b).row);
+			case "$LINE_NUMBER": Std.string(view.getPosition(region.b).row + 1);
+			case "$SOFT_TABS": "NO";
+			case "$TAB_SIZE": Std.string(4);
+			default: name;
+		}
 	}
 }

@@ -186,7 +186,7 @@ class View
 		command.run(edits[0], args);
 	}
 
-	function getPosition(index:Int):{col:Int, row:Int}
+	public function getPosition(index:Int):{col:Int, row:Int}
 	{
 		var lines = buffer.content.split("\n");
 		for (i in 0...lines.length)
@@ -389,13 +389,13 @@ class View
 			buffer.setFlagAt(region.b, Caret);
 		}
 		
-		for (field in fields)
-		{
-			for (region in field)
-			{
-				buffer.setFlag(region, Test);
-			}
-		}
+		// for (field in fields)
+		// {
+		// 	for (region in field)
+		// 	{
+		// 		buffer.setFlag(region, Test);
+		// 	}
+		// }
 
 		var scopes = language.process(buffer.content);
 		for (scope in scopes)

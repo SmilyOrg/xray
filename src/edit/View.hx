@@ -412,7 +412,7 @@ class View
 		// draw rulers
 		var rulers:Array<Int> = settings.get("rulers");
 		for (ruler in rulers)
-			context.fillRect(gutterWidth + ruler * charWidth, y, 2, charHeight);
+			context.fillRect(gutterWidth + ruler * charWidth, y, scale, charHeight);
 
 		// draw chars
 		var col = 0;
@@ -446,7 +446,7 @@ class View
 			if (buffer.hasFlagAt(i, Caret))
 			{
 				context.fillStyle = "white";
-				context.fillRect(x, y, 2, charHeight);
+				context.fillRect(x, y, scale, charHeight);
 			}
 
 			col += w;

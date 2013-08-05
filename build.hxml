@@ -5,6 +5,7 @@
 -cp src
 --macro include('edit')
 -resource res/haxe.json@haxe
+-resource res/settings.json@settings
 
 # -x edit.LanguageTest
 # -cp src

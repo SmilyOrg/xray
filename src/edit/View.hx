@@ -16,12 +16,14 @@ class View
 	public var fields:Array<RegionSet>;
 	public var currentField:Int;
 
+	var language:Language;
+	var settings:Settings;
+
 	var gutterWidth:Int;
 	var canvas:CanvasElement;
 	var canvas2:CanvasElement;
 	var context:CanvasRenderingContext2D;
 	var context2:CanvasRenderingContext2D;
-	var fontCanvas:CanvasElement;
 
 	var scale:Float;
 	var width:Int;
@@ -35,18 +37,20 @@ class View
 
 	var maxScrollX:Int;
 	var maxScrollY:Int;
-	var language:Language;
 
 	var theme:Map<String, Int>;
 	var colors:Map<Int, Int>;
 
 	public function new()
 	{
+		settings = new Settings(haxe.Json.parse(haxe.Resource.getString("settings")));
+		language = new Language(haxe.Resource.getString("haxe"));
+
 		fields = [];
 		currentField = 0;
 		
 		// config
-		fontSize = 16;
+		fontSize = settings.get("font_size");
 		gutterWidth = 100;
 
 		var document = js.Browser.document;
@@ -62,9 +66,6 @@ class View
 
 		// handle device pixel ratio
 		scale = window.devicePixelRatio;
-
-		// generate font
-		generateFont();
 		
 		// init selection
 		selection = new RegionSet();
@@ -107,8 +108,6 @@ class View
 		colors.set(6, 0x61d8f1);
 		colors.set(7, 0xa6e22e);
 		colors.set(8, 0xd1922e);
-
-		language = new Language(haxe.Resource.getString("haxe"));
 
 		var invScale = 1 / scale;
 		untyped canvas.style.webkitTransformOrigin = "top left";
@@ -313,15 +312,15 @@ class View
 
 		if (y > 0)
 		{
-			var start = getIndex(0, Math.floor(oldScrollY / charHeight));
-			var end = getIndex(0, Math.floor(scrollY / charHeight));
-			renderRegion(line(start).cover(line(end)));
+			var start = Math.floor(scrollY / charHeight);
+			var end = Math.ceil(oldScrollY / charHeight);
+			for (i in start...end) renderLine(i);
 		}
 		else if (y < 0)
 		{
-			var start = getIndex(0, Math.floor((oldScrollY + canvas.height) / charHeight));
-			var end = getIndex(0, Math.floor((scrollY + canvas.height) / charHeight));
-			renderRegion(line(start).cover(line(end)));
+			var start = Math.floor((oldScrollY + canvas.height) / charHeight);
+			var end = Math.ceil((scrollY + canvas.height) / charHeight);
+			for (i in start...end) renderLine(i);
 		}
 	}
 
@@ -347,31 +346,6 @@ class View
 		return buffer.content.length;
 	}
 
-	public function generateFont()
-	{
-		fontCanvas = js.Browser.document.createCanvasElement();
-
-		var context = fontCanvas.getContext2d();
-		var size = Std.int(fontSize * scale);
-		context.font = '${size}px Consolas';
-
-		charWidth = Math.ceil(context.measureText(".").width);
-		charHeight = Math.ceil(size);
-
-		var totalWidth = 127 * charWidth;
-		fontCanvas.width = totalWidth;
-		fontCanvas.height = charHeight;
-
-		context.fillStyle = "white";
-		context.textBaseline = "top";
-		context.font = '${size}px Consolas';
-
-		for (i in 0...127)
-		{
-			context.fillText(String.fromCharCode(i), i * charWidth, 0);
-		}
-	}
-
 	public function render()
 	{
 		context.clearRect(0, 0, canvas.width, canvas.height);
@@ -379,6 +353,9 @@ class View
 		var size = Std.int(fontSize * scale);
 		context.font = '${size}px Consolas';
 		context.textBaseline = "top";
+
+		charWidth = Math.ceil(context.measureText(".").width);
+		charHeight = Math.ceil(size);
 
 		var selected = new Map<Int, Bool>();
 		var carets = new Map<Int, Bool>();
@@ -407,44 +384,55 @@ class View
 		maxScrollY = lines * charHeight - canvas.height;
 
 		gutterWidth = (Std.string(lines).length + 3) * charWidth;
-		renderRegion(new Region(0, buffer.content.length));
+		for (i in 0...lines) renderLine(i);
 	}
 
-	function renderRegion(region:Region)
+	function renderLine(index:Int)
 	{
+		var region = line(getIndex(0, index));
+		var y = index * charHeight;
+
 		context.save();
 		context.translate(-scrollX, -scrollY);
-
-		var position = getPosition(region.a);
 		
-		var x = position.col;
-		var y = position.row;
+		// clear line
+		context.clearRect(0, y, canvas.width, charHeight);
+		
+		// draw selected line background
+		context.fillStyle = "#32322a";
+		for (selected in selection)
+			if (selected.a == selected.b && line(selected.a).a == region.a)
+				context.fillRect(0, y, canvas.width, charHeight);
 
+		// draw line number
+		context.fillStyle = "#8f908a";
+		var num = Std.string(index + 1);
+		context.fillText(num, gutterWidth - ((num.length + 2) * charWidth), y);
+
+		// draw rulers
+		var rulers:Array<Int> = settings.get("rulers");
+		for (ruler in rulers)
+			context.fillRect(gutterWidth + ruler * charWidth, y, 2, charHeight);
+
+		// draw chars
+		var col = 0;
 		for (i in region.a...region.b+1)
 		{
 			var code = buffer.content.charCodeAt(i);
 			var w = 1;
-			if (code == 9) w = (Math.floor(x/4)*4+4) - x;
-
-			if (x == 0)
-			{
-				var num = Std.string(y + 1);
-				context.fillStyle = "#8f908a";
-				context.fillText(num, gutterWidth - ((num.length + 2) * charWidth), y * charHeight);
-			}
-
-			context.clearRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
+			if (code == 9) w = (Math.floor(col/4)*4+4) - col;
+			var x = gutterWidth + col * charWidth;
 
 			if (buffer.hasFlagAt(i, Selected))
 			{
 				context.fillStyle = "#38382f";
-				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
+				context.fillRect(x, y, charWidth * w, charHeight);
 			}
 
 			if (buffer.hasFlagAt(i, Test))
 			{
 				context.fillStyle = "#f00";
-				context.fillRect(gutterWidth + x * charWidth, y * charHeight, charWidth * w, charHeight);
+				context.fillRect(x, y, charWidth * w, charHeight);
 			}
 
 			if (code != 10 && code != 9)
@@ -452,25 +440,16 @@ class View
 				var color = buffer.colors.get(i);
 				if (color == 0) context.fillStyle = "white";
 				else context.fillStyle = "#" + StringTools.hex(colors.get(color));
-
-				context.fillText(String.fromCharCode(code), gutterWidth + x * charWidth, y * charHeight);
+				context.fillText(String.fromCharCode(code), x, y);
 			}
 
 			if (buffer.hasFlagAt(i, Caret))
 			{
 				context.fillStyle = "white";
-				context.fillRect(gutterWidth + x * charWidth, y * charHeight, 2, charHeight);
+				context.fillRect(x, y, 2, charHeight);
 			}
-			
-			if (code == 10)
-			{
-				x = 0;
-				y ++;
-			}
-			else
-			{
-				x += w;
-			}
+
+			col += w;
 		}
 
 		context.restore();

@@ -11,7 +11,6 @@ class DecreaseFontSizeCommand extends TextCommand
 	{
 		if (view.fontSize <= 6) return;
 		view.fontSize -= 1;
-		view.generateFont();
 		view.render();
 	}
 }

@@ -1106,7 +1106,7 @@ edit.View.prototype = {
 	,render: function() {
 		this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
 		var size = this.fontSize * this.scale | 0;
-		this.context.font = "" + size + "px Consolas";
+		this.context.font = "" + size + "px \"Lucida Console\",Consolas,monospace";
 		this.context.textBaseline = "top";
 		this.charWidth = Math.ceil(this.context.measureText(".").width);
 		this.charHeight = Math.ceil(size);

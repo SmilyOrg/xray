@@ -1066,7 +1066,7 @@ edit.View.prototype = {
 		}
 		this.context.fillStyle = "#8f908a";
 		var num = Std.string(index + 1);
-		this.context.fillText(num,this.gutterWidth - (num.length + 2) * this.charWidth,y);
+		this.context.fillText(num,this.gutterWidth - (num.length + 2) * this.charWidth,y + 2 * this.scale);
 		var rulers = this.settings.values.get("rulers");
 		var _g = 0;
 		while(_g < rulers.length) {

@@ -1,4 +1,8 @@
 [
+	{ "keys":["ctrl+shift+t"], "command":"insert_snippet", "args":{ "contents":"\"Hello, ${1:this} is a ${2:snippet}.\"" }, "context":[
+		{ "key":"selection_empty", "operator":"equal", "operand":true, "match_all":true }
+	]},
+
 	{ "keys":["left"], "command":"move", "args":{ "by":"characters", "forward":false, "extend":false } },
 	{ "keys":["right"], "command":"move", "args":{ "by":"characters", "forward":true, "extend":false } },
 	{ "keys":["up"], "command":"move", "args":{ "by":"lines", "forward":false, "extend":false } },

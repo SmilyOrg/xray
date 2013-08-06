@@ -34,35 +34,27 @@ EReg.prototype = {
 	}
 	,matchSub: function(s,pos,len) {
 		if(len == null) len = -1;
-		return this.r.global?(function($this) {
-			var $r;
-			$this.r.lastIndex = pos;
-			$this.r.m = $this.r.exec(len < 0?s:HxOverrides.substr(s,0,pos + len));
-			var b = $this.r.m != null;
-			if(b) $this.r.s = s;
-			$r = b;
-			return $r;
-		}(this)):(function($this) {
-			var $r;
-			var b = $this.match(len < 0?HxOverrides.substr(s,pos,null):HxOverrides.substr(s,pos,len));
+		if(this.r.global) {
+			this.r.lastIndex = pos;
+			this.r.m = this.r.exec(len < 0?s:HxOverrides.substr(s,0,pos + len));
+			var b = this.r.m != null;
+			if(b) this.r.s = s;
+			return b;
+		} else {
+			var b = this.match(len < 0?HxOverrides.substr(s,pos,null):HxOverrides.substr(s,pos,len));
 			if(b) {
-				$this.r.s = s;
-				$this.r.m.index += pos;
+				this.r.s = s;
+				this.r.m.index += pos;
 			}
-			$r = b;
-			return $r;
-		}(this));
+			return b;
+		}
 	}
 	,matchedPos: function() {
 		if(this.r.m == null) throw "No string matched";
 		return { pos : this.r.m.index, len : this.r.m[0].length};
 	}
 	,matched: function(n) {
-		return this.r.m != null && n >= 0 && n < this.r.m.length?this.r.m[n]:(function($this) {
-			var $r;
-			throw "EReg::matched";
-			return $r;
-		}(this));
+		if(this.r.m != null && n >= 0 && n < this.r.m.length) return this.r.m[n]; else throw "EReg::matched";
 	}
 	,match: function(s) {
 		if(this.r.global) this.r.lastIndex = 0;
@@ -303,7 +295,8 @@ edit.Buffer.prototype = {
 		return (enumFlags & 1 << flag[1]) != 0;
 	}
 	,clearFlag: function(region,flag) {
-		var _g1 = region.begin(), _g = region.end();
+		var _g1 = region.begin();
+		var _g = region.end();
 		while(_g1 < _g) {
 			var i = _g1++;
 			var enumFlags = this.flags.b[i];
@@ -317,14 +310,16 @@ edit.Buffer.prototype = {
 		this.flags.b[index] = enumFlags & 255;
 	}
 	,setColor: function(region,color) {
-		var _g1 = region.begin(), _g = region.end();
+		var _g1 = region.begin();
+		var _g = region.end();
 		while(_g1 < _g) {
 			var i = _g1++;
 			this.colors.b[i] = color & 255;
 		}
 	}
 	,setFlag: function(region,flag) {
-		var _g1 = region.begin(), _g = region.end();
+		var _g1 = region.begin();
+		var _g = region.end();
 		while(_g1 < _g) {
 			var i = _g1++;
 			this.setFlagAt(i,flag);
@@ -335,7 +330,8 @@ edit.Buffer.prototype = {
 	}
 	,insert: function(index,length,string) {
 		this.content = HxOverrides.substr(this.content,0,index) + string + HxOverrides.substr(this.content,index + length,null);
-		var _g = 0, _g1 = this.buffers;
+		var _g = 0;
+		var _g1 = this.buffers;
 		while(_g < _g1.length) {
 			var buffer = _g1[_g];
 			++_g;
@@ -378,14 +374,15 @@ edit.Edit.prototype = {
 		while(_g < len) {
 			var i = _g++;
 			var operation = this.operations[i];
-			var $e = (operation);
-			switch( $e[1] ) {
+			switch(operation[1]) {
 			case 0:
-				var string = $e[3], region = $e[2];
+				var string = operation[3];
+				var region = operation[2];
 				this.view.erase(null,region);
 				break;
 			case 1:
-				var string = $e[3], region = $e[2];
+				var string = operation[3];
+				var region = operation[2];
 				this.view.insert(null,region.begin(),string);
 				break;
 			}
@@ -398,14 +395,15 @@ edit.Edit.prototype = {
 		while(_g < len) {
 			var i = _g++;
 			var operation = this.operations[len - (i + 1)];
-			var $e = (operation);
-			switch( $e[1] ) {
+			switch(operation[1]) {
 			case 0:
-				var string = $e[3], region = $e[2];
+				var string = operation[3];
+				var region = operation[2];
 				this.view.insert(null,region.begin(),string);
 				break;
 			case 1:
-				var string = $e[3], region = $e[2];
+				var string = operation[3];
+				var region = operation[2];
 				this.view.erase(null,region);
 				break;
 			}
@@ -440,7 +438,8 @@ edit.Input = function(view) {
 	document.addEventListener("copy",$bind(this,this.copy));
 	document.addEventListener("cut",$bind(this,this.cut));
 	var platform = js.Browser.window.navigator.platform;
-	var os = platform.indexOf("Mac") > -1?"mac":"win";
+	var os;
+	if(platform.indexOf("Mac") > -1) os = "mac"; else os = "win";
 	var http = new haxe.Http("keymap-" + os + ".json");
 	http.onData = function(data) {
 		_g.mappings = haxe.Json.parse(data);
@@ -457,89 +456,86 @@ edit.Input.prototype = {
 		while(_g < keys1.length) {
 			var key = keys1[_g];
 			++_g;
-			var keyCodes = (function($this) {
-				var $r;
-				switch(key) {
-				case "left":
-					$r = [37];
-					break;
-				case "right":
-					$r = [39];
-					break;
-				case "up":
-					$r = [38];
-					break;
-				case "down":
-					$r = [40];
-					break;
-				case "backspace":
-					$r = [8];
-					break;
-				case "escape":
-					$r = [27];
-					break;
-				case "delete":
-					$r = [46];
-					break;
-				case "shift":
-					$r = [16];
-					break;
-				case "ctrl":
-					$r = [17];
-					break;
-				case "alt":
-					$r = [18];
-					break;
-				case "super":
-					$r = [91];
-					break;
-				case "enter":
-					$r = [13];
-					break;
-				case "end":
-					$r = [35];
-					break;
-				case "home":
-					$r = [36];
-					break;
-				case "-":
-					$r = [189];
-					break;
-				case "=":
-					$r = [187];
-					break;
-				case "tab":
-					$r = [9];
-					break;
-				case "[":
-					$r = [219];
-					break;
-				case "]":
-					$r = [221];
-					break;
-				case "{":
-					$r = [16,219];
-					break;
-				case "}":
-					$r = [16,221];
-					break;
-				case "(":
-					$r = [16,57];
-					break;
-				case ")":
-					$r = [16,48];
-					break;
-				case "'":
-					$r = [222];
-					break;
-				case "\"":
-					$r = [16,222];
-					break;
-				default:
-					$r = [HxOverrides.cca(key.toUpperCase(),0)];
-				}
-				return $r;
-			}(this));
+			var keyCodes;
+			switch(key) {
+			case "left":
+				keyCodes = [37];
+				break;
+			case "right":
+				keyCodes = [39];
+				break;
+			case "up":
+				keyCodes = [38];
+				break;
+			case "down":
+				keyCodes = [40];
+				break;
+			case "backspace":
+				keyCodes = [8];
+				break;
+			case "escape":
+				keyCodes = [27];
+				break;
+			case "delete":
+				keyCodes = [46];
+				break;
+			case "shift":
+				keyCodes = [16];
+				break;
+			case "ctrl":
+				keyCodes = [17];
+				break;
+			case "alt":
+				keyCodes = [18];
+				break;
+			case "super":
+				keyCodes = [91];
+				break;
+			case "enter":
+				keyCodes = [13];
+				break;
+			case "end":
+				keyCodes = [35];
+				break;
+			case "home":
+				keyCodes = [36];
+				break;
+			case "-":
+				keyCodes = [189];
+				break;
+			case "=":
+				keyCodes = [187];
+				break;
+			case "tab":
+				keyCodes = [9];
+				break;
+			case "[":
+				keyCodes = [219];
+				break;
+			case "]":
+				keyCodes = [221];
+				break;
+			case "{":
+				keyCodes = [16,219];
+				break;
+			case "}":
+				keyCodes = [16,221];
+				break;
+			case "(":
+				keyCodes = [16,57];
+				break;
+			case ")":
+				keyCodes = [16,48];
+				break;
+			case "'":
+				keyCodes = [222];
+				break;
+			case "\"":
+				keyCodes = [16,222];
+				break;
+			default:
+				keyCodes = [HxOverrides.cca(key.toUpperCase(),0)];
+			}
 			var _g1 = 0;
 			while(_g1 < keyCodes.length) {
 				var code = keyCodes[_g1];
@@ -605,7 +601,8 @@ edit.Input.prototype = {
 		if(e.ctrlKey) down.push(17);
 		if(e.altKey) down.push(18);
 		down.push(e.keyCode);
-		var _g = 0, _g1 = this.mappings;
+		var _g = 0;
+		var _g1 = this.mappings;
 		while(_g < _g1.length) {
 			var mapping = _g1[_g];
 			++_g;
@@ -622,67 +619,58 @@ edit.Input.prototype = {
 				}
 			}
 			if(execute && mapping.context != null) {
-				var _g2 = 0, _g3 = mapping.context;
+				var _g2 = 0;
+				var _g3 = mapping.context;
 				while(_g2 < _g3.length) {
 					var context = _g3[_g2];
 					++_g2;
 					var $it0 = this.view.selection.iterator();
 					while( $it0.hasNext() ) {
 						var region = $it0.next();
-						var value = (function($this) {
-							var $r;
-							switch(context.key) {
-							case "selection_empty":
-								$r = region.size() == 0;
-								break;
-							case "preceding_text":
-								$r = $this.view.substr(new edit.Region(0,region.begin()));
-								break;
-							case "following_text":
-								$r = $this.view.substr(new edit.Region(region.end(),$this.view.size()));
-								break;
-							case "text":
-								$r = $this.view.substr(region);
-								break;
-							case "num_selections":
-								$r = Lambda.count($this.view.selection);
-								break;
-							case "has_prev_field":
-								$r = $this.view.currentField > 0;
-								break;
-							case "has_next_field":
-								$r = $this.view.currentField < $this.view.fields.length - 1;
-								break;
-							default:
-								$r = null;
-							}
-							return $r;
-						}(this));
-						var result = (function($this) {
-							var $r;
-							switch(context.operator) {
-							case "equal":
-								$r = value == context.operand;
-								break;
-							case "not_equal":
-								$r = value != context.operand;
-								break;
-							case "regex_contains":
-								$r = new EReg(context.operand,"").match(value);
-								break;
-							case "not_regex_contains":
-								$r = (function($this) {
-									var $r;
-									console.log(value);
-									$r = !new EReg(context.operand,"").match(value);
-									return $r;
-								}($this));
-								break;
-							default:
-								$r = true;
-							}
-							return $r;
-						}(this));
+						var value;
+						switch(context.key) {
+						case "selection_empty":
+							value = region.size() == 0;
+							break;
+						case "preceding_text":
+							value = this.view.substr(new edit.Region(0,region.begin()));
+							break;
+						case "following_text":
+							value = this.view.substr(new edit.Region(region.end(),this.view.size()));
+							break;
+						case "text":
+							value = this.view.substr(region);
+							break;
+						case "num_selections":
+							value = Lambda.count(this.view.selection);
+							break;
+						case "has_prev_field":
+							value = this.view.currentField > 0;
+							break;
+						case "has_next_field":
+							value = this.view.currentField < this.view.fields.length - 1;
+							break;
+						default:
+							value = null;
+						}
+						var result;
+						switch(context.operator) {
+						case "equal":
+							result = value == context.operand;
+							break;
+						case "not_equal":
+							result = value != context.operand;
+							break;
+						case "regex_contains":
+							result = new EReg(context.operand,"").match(value);
+							break;
+						case "not_regex_contains":
+							console.log(value);
+							result = !new EReg(context.operand,"").match(value);
+							break;
+						default:
+							result = true;
+						}
 						if(!result) execute = false;
 						if(!execute) break;
 					}
@@ -723,7 +711,8 @@ $hxClasses["edit.Language"] = edit.Language;
 edit.Language.__name__ = true;
 edit.Language.prototype = {
 	processCaptures: function(region,captures,match,scopes) {
-		var _g = 0, _g1 = Reflect.fields(captures);
+		var _g = 0;
+		var _g1 = Reflect.fields(captures);
 		while(_g < _g1.length) {
 			var field = _g1[_g];
 			++_g;
@@ -747,7 +736,8 @@ edit.Language.prototype = {
 		var regions = [range];
 		var subScopes = [];
 		if(pattern.patterns != null) {
-			var _g = 0, _g1 = pattern.patterns;
+			var _g = 0;
+			var _g1 = pattern.patterns;
 			while(_g < _g1.length) {
 				var pattern1 = _g1[_g];
 				++_g;
@@ -792,13 +782,14 @@ edit.Language.prototype = {
 		return matchRegion;
 	}
 	,search: function(source,region,pattern,scopes) {
-		return pattern.match != null?this.searchMatch(source,region,pattern,scopes):this.searchRange(source,region,pattern,scopes);
+		if(pattern.match != null) return this.searchMatch(source,region,pattern,scopes); else return this.searchRange(source,region,pattern,scopes);
 	}
 	,process: function(source) {
 		var region = new edit.Region(0,source.length);
 		var regions = [region];
 		var scopes = [];
-		var _g = 0, _g1 = this.definition.patterns;
+		var _g = 0;
+		var _g1 = this.definition.patterns;
 		while(_g < _g1.length) {
 			var pattern = _g1[_g];
 			++_g;
@@ -823,7 +814,8 @@ edit.Language.prototype = {
 		return scopes;
 	}
 	,revive: function(json) {
-		var _g = 0, _g1 = Reflect.fields(json);
+		var _g = 0;
+		var _g1 = Reflect.fields(json);
 		while(_g < _g1.length) {
 			var field = _g1[_g];
 			++_g;
@@ -864,7 +856,7 @@ edit.Region.prototype = {
 			this.b -= size2;
 		} else if(this.intersects(region)) {
 			var cross = this.size() - this.intersection(region).size();
-			this.a = this.begin() < region.begin()?this.begin():region.begin();
+			if(this.begin() < region.begin()) this.a = this.begin(); else this.a = region.begin();
 			this.b = this.a + cross;
 		}
 	}
@@ -873,8 +865,10 @@ edit.Region.prototype = {
 		if(point <= this.b) this.b += length;
 	}
 	,cover: function(region) {
-		var a = this.begin() < region.begin()?this.begin():region.begin();
-		var b = this.end() > region.end()?this.end():region.end();
+		var a;
+		if(this.begin() < region.begin()) a = this.begin(); else a = region.begin();
+		var b;
+		if(this.end() > region.end()) b = this.end(); else b = region.end();
 		return new edit.Region(a,b);
 	}
 	,containsRegion: function(region) {
@@ -885,8 +879,10 @@ edit.Region.prototype = {
 	}
 	,intersection: function(region) {
 		if(this.intersects(region)) {
-			var a = this.begin() > region.begin()?this.begin():region.begin();
-			var b = this.end() < region.end()?this.end():region.end();
+			var a;
+			if(this.begin() > region.begin()) a = this.begin(); else a = region.begin();
+			var b;
+			if(this.end() < region.end()) b = this.end(); else b = region.end();
 			return new edit.Region(a,b);
 		}
 		return new edit.Region(0,0);
@@ -901,10 +897,10 @@ edit.Region.prototype = {
 		return Math.abs(this.a - this.b) | 0;
 	}
 	,end: function() {
-		return this.a > this.b?this.a:this.b;
+		if(this.a > this.b) return this.a; else return this.b;
 	}
 	,begin: function() {
-		return this.a < this.b?this.a:this.b;
+		if(this.a < this.b) return this.a; else return this.b;
 	}
 	,__class__: edit.Region
 }
@@ -930,7 +926,8 @@ edit.RegionSet.prototype = {
 	}
 	,clone: function() {
 		var set = new edit.RegionSet();
-		var _g = 0, _g1 = this.regions;
+		var _g = 0;
+		var _g1 = this.regions;
 		while(_g < _g1.length) {
 			var region = _g1[_g];
 			++_g;
@@ -980,7 +977,8 @@ edit.RegionTest.testSubtract = function(a1,b1,a2,b2,a3,b3) {
 }
 edit.Settings = function(json) {
 	this.values = new haxe.ds.StringMap();
-	var _g = 0, _g1 = Reflect.fields(json);
+	var _g = 0;
+	var _g1 = Reflect.fields(json);
 	while(_g < _g1.length) {
 		var field = _g1[_g];
 		++_g;
@@ -1066,7 +1064,7 @@ edit.View.prototype = {
 		}
 		this.context.fillStyle = "#8f908a";
 		var num = Std.string(index + 1);
-		this.context.fillText(num,this.gutterWidth - (num.length + 2) * this.charWidth,y + 2 * this.scale);
+		this.context.fillText(num,this.gutterWidth - (num.length + 2) * this.charWidth,y);
 		var rulers = this.settings.values.get("rulers");
 		var _g = 0;
 		while(_g < rulers.length) {
@@ -1075,7 +1073,8 @@ edit.View.prototype = {
 			this.context.fillRect(this.gutterWidth + ruler * this.charWidth,y,this.scale,this.charHeight);
 		}
 		var col = 0;
-		var _g1 = region.a, _g = region.b + 1;
+		var _g1 = region.a;
+		var _g = region.b + 1;
 		while(_g1 < _g) {
 			var i = _g1++;
 			var code = HxOverrides.cca(this.buffer.content,i);
@@ -1093,7 +1092,7 @@ edit.View.prototype = {
 			if(code != 10 && code != 9) {
 				var color = this.buffer.colors.b[i];
 				if(color == 0) this.context.fillStyle = "white"; else this.context.fillStyle = "#" + StringTools.hex(this.colors.get(color));
-				this.context.fillText(String.fromCharCode(code),x,y + 2 * this.scale);
+				this.context.fillText(String.fromCharCode(code),x,y);
 			}
 			if(this.buffer.hasFlagAt(i,edit.BufferFlag.Caret)) {
 				this.context.fillStyle = "white";
@@ -1106,11 +1105,10 @@ edit.View.prototype = {
 	,render: function() {
 		this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
 		var size = this.fontSize * this.scale | 0;
-		this.context.font = "" + size + "px \"Lucida Console\",Consolas,monospace";
+		this.context.font = "" + size + "px Consolas";
 		this.context.textBaseline = "top";
-		var metrics = this.context.measureText(".");
-		this.charWidth = Math.ceil(metrics.width);
-		this.charHeight = Math.ceil(size * 1.2);
+		this.charWidth = Math.ceil(this.context.measureText(".").width);
+		this.charHeight = Math.ceil(size);
 		var selected = new haxe.ds.IntMap();
 		var carets = new haxe.ds.IntMap();
 		this.buffer.clearFlags();
@@ -1227,7 +1225,8 @@ edit.View.prototype = {
 		if(line == null) return this.size();
 		var charCol = 0;
 		var charX = 0;
-		var _g1 = 0, _g = line.length;
+		var _g1 = 0;
+		var _g = line.length;
 		while(_g1 < _g) {
 			var i = _g1++;
 			var code = HxOverrides.cca(line,i);
@@ -1244,7 +1243,8 @@ edit.View.prototype = {
 		var index = 0;
 		var lines = this.buffer.content.split("\n");
 		if(row > lines.length - 1) return this.buffer.content.length;
-		var _g1 = 0, _g = lines.length;
+		var _g1 = 0;
+		var _g = lines.length;
 		while(_g1 < _g) {
 			var i = _g1++;
 			var line = lines[i];
@@ -1258,7 +1258,8 @@ edit.View.prototype = {
 	}
 	,getPosition: function(index) {
 		var lines = this.buffer.content.split("\n");
-		var _g1 = 0, _g = lines.length;
+		var _g1 = 0;
+		var _g = lines.length;
 		while(_g1 < _g) {
 			var i = _g1++;
 			index -= lines[i].length + 1;
@@ -1269,7 +1270,8 @@ edit.View.prototype = {
 	,runCommand: function(name,args) {
 		if(this.edits.length == 0) this.beginEdit();
 		var className = "edit.command.";
-		var _g = 0, _g1 = name.split("_");
+		var _g = 0;
+		var _g1 = name.split("_");
 		while(_g < _g1.length) {
 			var part = _g1[_g];
 			++_g;
@@ -1299,7 +1301,8 @@ edit.View.prototype = {
 		if(edit != null) edit.erase(region);
 		this.buffer.insert(region.begin(),region.size(),"");
 		this.selection.subtract(region);
-		var _g = 0, _g1 = this.fields;
+		var _g = 0;
+		var _g1 = this.fields;
 		while(_g < _g1.length) {
 			var field = _g1[_g];
 			++_g;
@@ -1309,7 +1312,8 @@ edit.View.prototype = {
 	,insert: function(edit,point,string) {
 		if(edit != null) edit.insert(point,string);
 		this.selection.insert(point,string.length);
-		var _g = 0, _g1 = this.fields;
+		var _g = 0;
+		var _g1 = this.fields;
 		while(_g < _g1.length) {
 			var field = _g1[_g];
 			++_g;
@@ -1502,44 +1506,30 @@ edit.command.InsertSnippetCommand.__name__ = true;
 edit.command.InsertSnippetCommand.__super__ = edit.command.TextCommand;
 edit.command.InsertSnippetCommand.prototype = $extend(edit.command.TextCommand.prototype,{
 	getVariable: function(name,region) {
-		return (function($this) {
-			var $r;
-			switch(name) {
-			case "$SELECTION":case "$SELECTED_TEXT":
-				$r = $this.view.substr(region);
-				break;
-			case "$CURRENT_LINE":
-				$r = $this.view.substr($this.view.line(region.b));
-				break;
-			case "$CURRENT_WORD":
-				$r = $this.view.substr($this.view.word(region.b));
-				break;
-			case "$FILENAME":
-				$r = "Todo.hx";
-				break;
-			case "$FILEPATH":
-				$r = "/ws/project/src/Todo.hx";
-				break;
-			case "$FULLNAME":
-				$r = "David Peek";
-				break;
-			case "$LINE_INDEX":
-				$r = Std.string($this.view.getPosition(region.b).row);
-				break;
-			case "$LINE_NUMBER":
-				$r = Std.string($this.view.getPosition(region.b).row + 1);
-				break;
-			case "$SOFT_TABS":
-				$r = "NO";
-				break;
-			case "$TAB_SIZE":
-				$r = "4";
-				break;
-			default:
-				$r = name;
-			}
-			return $r;
-		}(this));
+		switch(name) {
+		case "$SELECTION":case "$SELECTED_TEXT":
+			return this.view.substr(region);
+		case "$CURRENT_LINE":
+			return this.view.substr(this.view.line(region.b));
+		case "$CURRENT_WORD":
+			return this.view.substr(this.view.word(region.b));
+		case "$FILENAME":
+			return "Todo.hx";
+		case "$FILEPATH":
+			return "/ws/project/src/Todo.hx";
+		case "$FULLNAME":
+			return "David Peek";
+		case "$LINE_INDEX":
+			return Std.string(this.view.getPosition(region.b).row);
+		case "$LINE_NUMBER":
+			return Std.string(this.view.getPosition(region.b).row + 1);
+		case "$SOFT_TABS":
+			return "NO";
+		case "$TAB_SIZE":
+			return "4";
+		default:
+			return name;
+		}
 	}
 	,run: function(edit1,args) {
 		var _g = this;
@@ -1645,11 +1635,14 @@ edit.command.MoveCommand.__name__ = true;
 edit.command.MoveCommand.__super__ = edit.command.TextCommand;
 edit.command.MoveCommand.prototype = $extend(edit.command.TextCommand.prototype,{
 	moveRegion: function(region,args) {
-		var dir = args.forward?1:-1;
+		var dir;
+		if(args.forward) dir = 1; else dir = -1;
 		var index = region.b;
 		switch(args.by) {
 		case "lines":
-			if(!args.extend && region.size() > 0) index = dir < 0?region.begin():region.end();
+			if(!args.extend && region.size() > 0) {
+				if(dir < 0) index = region.begin(); else index = region.end();
+			}
 			var line = this.view.fullLine(index);
 			var col = index - line.a;
 			if(dir > 0) {
@@ -1664,7 +1657,7 @@ edit.command.MoveCommand.prototype = $extend(edit.command.TextCommand.prototype,
 			break;
 		case "characters":
 			if(!args.extend && region.size() > 0) {
-				index = dir < 0?region.begin():region.end();
+				if(dir < 0) index = region.begin(); else index = region.end();
 				dir = 0;
 			}
 			region.b = index + dir;
@@ -1884,15 +1877,12 @@ haxe.Http.prototype = {
 		var r = js.Browser.createXMLHttpRequest();
 		var onreadystatechange = function(_) {
 			if(r.readyState != 4) return;
-			var s = (function($this) {
-				var $r;
-				try {
-					$r = r.status;
-				} catch( e ) {
-					$r = null;
-				}
-				return $r;
-			}(this));
+			var s;
+			try {
+				s = r.status;
+			} catch( e ) {
+				s = null;
+			}
 			if(s == undefined) s = null;
 			if(s != null) me.onStatus(s);
 			if(s != null && s >= 200 && s < 400) me.onData(me.responseData = r.responseText); else if(s == null) me.onError("Failed to connect or resolve host"); else switch(s) {
@@ -1948,8 +1938,13 @@ haxe.Json.parse = function(text) {
 haxe.Json.prototype = {
 	parseNumber: function(c) {
 		var start = this.pos - 1;
-		var minus = c == 45, digit = !minus, zero = c == 48;
-		var point = false, e = false, pm = false, end = false;
+		var minus = c == 45;
+		var digit = !minus;
+		var zero = c == 48;
+		var point = false;
+		var e = false;
+		var pm = false;
+		var end = false;
 		while(true) {
 			c = this.str.charCodeAt(this.pos++);
 			switch(c) {
@@ -1991,7 +1986,7 @@ haxe.Json.prototype = {
 		}
 		var f = Std.parseFloat(HxOverrides.substr(this.str,start,this.pos - start));
 		var i = f | 0;
-		return i == f?i:f;
+		if(i == f) return i; else return f;
 	}
 	,invalidNumber: function(start) {
 		throw "Invalid number at position " + start + ": " + HxOverrides.substr(this.str,start,this.pos - start);
@@ -2045,7 +2040,9 @@ haxe.Json.prototype = {
 			case 32:case 13:case 10:case 9:
 				break;
 			case 123:
-				var obj = { }, field = null, comma = null;
+				var obj = { };
+				var field = null;
+				var comma = null;
 				while(true) {
 					var c1 = this.str.charCodeAt(this.pos++);
 					switch(c1) {
@@ -2073,7 +2070,8 @@ haxe.Json.prototype = {
 				}
 				break;
 			case 91:
-				var arr = [], comma = null;
+				var arr = [];
+				var comma = null;
 				while(true) {
 					var c1 = this.str.charCodeAt(this.pos++);
 					switch(c1) {
@@ -2138,7 +2136,8 @@ haxe.Resource = function() { }
 $hxClasses["haxe.Resource"] = haxe.Resource;
 haxe.Resource.__name__ = true;
 haxe.Resource.getString = function(name) {
-	var _g = 0, _g1 = haxe.Resource.content;
+	var _g = 0;
+	var _g1 = haxe.Resource.content;
 	while(_g < _g1.length) {
 		var x = _g1[_g];
 		++_g;
@@ -2173,7 +2172,8 @@ $hxClasses["haxe.Unserializer"] = haxe.Unserializer;
 haxe.Unserializer.__name__ = true;
 haxe.Unserializer.initCodes = function() {
 	var codes = new Array();
-	var _g1 = 0, _g = haxe.Unserializer.BASE64.length;
+	var _g1 = 0;
+	var _g = haxe.Unserializer.BASE64.length;
 	while(_g1 < _g) {
 		var i = _g1++;
 		codes[haxe.Unserializer.BASE64.charCodeAt(i)] = i;
@@ -2332,7 +2332,8 @@ haxe.Unserializer.prototype = {
 			}
 			var i = this.pos;
 			var rest = len & 3;
-			var size = (len >> 2) * 3 + (rest >= 2?rest - 1:0);
+			var size;
+			size = (len >> 2) * 3 + (rest >= 2?rest - 1:0);
 			var max = i + (len - rest);
 			var bytes = haxe.io.Bytes.alloc(size);
 			var bpos = 0;
@@ -2444,7 +2445,8 @@ haxe.ds.ObjectMap.__name__ = true;
 haxe.ds.ObjectMap.__interfaces__ = [IMap];
 haxe.ds.ObjectMap.prototype = {
 	set: function(key,value) {
-		var id = key.__id__ != null?key.__id__:key.__id__ = ++haxe.ds.ObjectMap.count;
+		var id;
+		if(key.__id__ != null) id = key.__id__; else id = key.__id__ = ++haxe.ds.ObjectMap.count;
 		this.h[id] = value;
 		this.h.__keys__[id] = key;
 	}
@@ -2562,7 +2564,8 @@ js.Boot.__string_rec = function(o,s) {
 				if(o.length == 2) return o[0];
 				var str = o[0] + "(";
 				s += "\t";
-				var _g1 = 2, _g = o.length;
+				var _g1 = 2;
+				var _g = o.length;
 				while(_g1 < _g) {
 					var i = _g1++;
 					if(i != 2) str += "," + js.Boot.__string_rec(o[i],s); else str += js.Boot.__string_rec(o[i],s);
@@ -2621,7 +2624,8 @@ js.Boot.__interfLoop = function(cc,cl) {
 	if(cc == cl) return true;
 	var intf = cc.__interfaces__;
 	if(intf != null) {
-		var _g1 = 0, _g = intf.length;
+		var _g1 = 0;
+		var _g = intf.length;
 		while(_g1 < _g) {
 			var i = _g1++;
 			var i1 = intf[i];

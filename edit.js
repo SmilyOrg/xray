@@ -1093,7 +1093,7 @@ edit.View.prototype = {
 			if(code != 10 && code != 9) {
 				var color = this.buffer.colors.b[i];
 				if(color == 0) this.context.fillStyle = "white"; else this.context.fillStyle = "#" + StringTools.hex(this.colors.get(color));
-				this.context.fillText(String.fromCharCode(code),x,y);
+				this.context.fillText(String.fromCharCode(code),x,y + 2 * this.scale);
 			}
 			if(this.buffer.hasFlagAt(i,edit.BufferFlag.Caret)) {
 				this.context.fillStyle = "white";
@@ -1108,8 +1108,9 @@ edit.View.prototype = {
 		var size = this.fontSize * this.scale | 0;
 		this.context.font = "" + size + "px \"Lucida Console\",Consolas,monospace";
 		this.context.textBaseline = "top";
-		this.charWidth = Math.ceil(this.context.measureText(".").width);
-		this.charHeight = Math.ceil(size);
+		var metrics = this.context.measureText(".");
+		this.charWidth = Math.ceil(metrics.width);
+		this.charHeight = Math.ceil(size * 1.2);
 		var selected = new haxe.ds.IntMap();
 		var carets = new haxe.ds.IntMap();
 		this.buffer.clearFlags();

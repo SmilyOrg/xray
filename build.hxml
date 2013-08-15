@@ -7,5 +7,8 @@
 -resource res/haxe.json@haxe
 -resource res/settings.json@settings
 
-# -x edit.LanguageTest
-# -cp src
+--next
+
+-main edit.Server
+-neko pages/server.n
+-cp src

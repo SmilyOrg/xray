@@ -1,4 +1,5 @@
 -neko api
+-lib format
 --no-output
 -dce no
 -cp src

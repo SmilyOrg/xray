@@ -51,9 +51,21 @@ class Import
 
 	static function includePath(path:String, ?pack:String="")
 	{
+		
 		if (path == "src") return;
 		if (path == ".") return;
 		if (path.endsWith("_std")) return;
+		
+		if (pack != null && pack == "cpp") return;
+		if (pack != null && pack == "cs") return;
+		if (pack != null && pack == "flash") return;
+		if (pack != null && pack == "flash8") return;
+		if (pack != null && pack == "java") return;
+		if (pack != null && pack == "js") return;
+		if (pack != null && pack == "php") return;
+		if (pack != null && pack == "format") return;
+		
+		trace('include path $path $pack');
 		
 		for (file in FileSystem.readDirectory(path))
 		{
@@ -62,6 +74,8 @@ class Import
 			if (file == "SocketWrapper.hx") continue;
 			if (file == "SyncSocketConnection.hx") continue;
 			if (file == "ExampleJSGenerator.hx") continue;
+			
+			trace('loop $file');
 
 			if (file.charAt(0) == "_" || file.charAt(0) == "." || file.indexOf("-") > -1) continue;
 			var entry = path + "/" + file;

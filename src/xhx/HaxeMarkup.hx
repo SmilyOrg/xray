@@ -1,14 +1,19 @@
 package xhx;
 
-import xhx.Data;
-import xhx.HaxeLexer;
-import hxparse.LexerStream;
+import byte.ByteData;
+import haxeparser.Data.Token;
+import haxeparser.Data.TokenDef;
+import haxeparser.HaxeLexer;
+import hxparse.Parser.Parser;
+import hxparse.Position;
+import hxparse.TokenSource;
 import haxe.macro.Expr;
 using Lambda;
+using StringTools;
 
 typedef TypeExports = Map<String, Array<{name:String, pos:Array<Int>}>>;
 
-class HaxeMarkup
+class HaxeMarkup extends Parser<HaxeLexer, Token>
 {
 	public inline static var DIRECTIVE = "directive";
 	public inline static var KEYWORD = "keyword";
@@ -47,7 +52,6 @@ class HaxeMarkup
 	var source:String;
 	var max:Int;
 	var buf:StringBuf;
-	var stream:LexerStream<Token>;
 	var stack:Array<Bool>;
 	var pad:Int;
 	var exports:TypeExports;
@@ -65,9 +69,11 @@ class HaxeMarkup
 		this.max = 0;
 		this.buf = new StringBuf();
 		this.stack = [];
-
-		var input = new haxe.io.StringInput(source);
-		stream = new LexerStream(new HaxeLexer(input, file), HaxeLexer.tok);
+		
+		super(new HaxeLexer(ByteData.ofString(source), file), HaxeLexer.tok);
+		
+		//var input = new haxe.io.StringInput(source);
+		//stream = new LexerStream(new HaxeLexer(input, file), HaxeLexer.tok);
 
 		imports = ["StdTypes"];
 		pad = Std.string(source.split("\n").length).length;
@@ -119,7 +125,7 @@ class HaxeMarkup
 			}
 		}
 
-		stream.junk();
+		junk();
 	}
 
 	function isDefined(flag:String)
@@ -130,13 +136,13 @@ class HaxeMarkup
 
 	function parseMacro():Bool
 	{
-		var token = stream.peek();
+		var token = peek(0);
 		return switch (token.tok)
 		{
 			case Const(CIdent(s)):
 				add(token, MACRO);
 				isDefined(s);
-			case Kwd(Macro):
+			case Kwd(KwdMacro):
 				add(token, MACRO);
 				defines.exists(MACRO);
 			case Unop(OpNot):
@@ -145,7 +151,7 @@ class HaxeMarkup
 			case POpen:
 				add(token, MACRO);
 				var val = parseMacro();
-				token = stream.peek();
+				token = peek(0);
 				while (token.tok != Eof)
 				{
 					switch (token.tok)
@@ -162,7 +168,7 @@ class HaxeMarkup
 						case _:
 							throw "invalid macro condition " + token.tok;
 					}
-					token = stream.peek();
+					token = peek(0);
 				}
 				val;
 			case _: false;
@@ -173,7 +179,7 @@ class HaxeMarkup
 	{
 		var tokens = [];
 		var index = 0;
-		var token = stream.peek();
+		var token = peek(0);
 
 		while (token.tok != Eof)
 		{
@@ -185,19 +191,20 @@ class HaxeMarkup
 					var code = s.charCodeAt(0);
 					if (code > 64 && code < 91)
 					{
-						var token = {pos:punion(tokens[0].pos, tokens[tokens.length - 1].pos), tok:null};
+						//var token:Token = { tok: null, pos: punion(tokens[0].pos, tokens[tokens.length - 1].pos) };
+						var token = new Token(null, punion(tokens[0].pos, tokens[tokens.length - 1].pos));
 						add(token, TYPE);
 						tokens.pop();
-						for (token in tokens) stream.junk();
+						for (token in tokens) junk();
 						return src(token.pos);
 					}
-				case Kwd(Macro), Dot:
+				case Kwd(KwdMacro), Dot:
 				case _:
 					return null;
 			}
 
 			index += 1;
-			token = stream.peek(index);
+			token = peek(index);
 		}
 
 		return null;
@@ -205,7 +212,7 @@ class HaxeMarkup
 
 	public function skipTokens()
 	{
-		var token = stream.peek();
+		var token = peek(0);
 		var start = stack.length;
 
 		while (token.tok != Eof)
@@ -237,13 +244,13 @@ class HaxeMarkup
 					add(token, "inactive");
 			}
 
-			token = stream.peek();
+			token = peek(0);
 		}
 	}
 
 	public function parse()
 	{
-		var token = stream.peek();
+		var token = peek(0);
 
 		while (token.tok != Eof)
 		{
@@ -285,11 +292,11 @@ class HaxeMarkup
 					{
 						stack.shift();
 					}
-				case Kwd(Import):
+				case Kwd(KwdImport):
 					add(token, DIRECTIVE);
 					imports.push(parseTypeId());
 
-				case Kwd(Class), Kwd(Enum), Kwd(Abstract), Kwd(Typedef), Kwd(Package):
+				case Kwd(KwdClass), Kwd(KwdEnum), Kwd(KwdAbstract), Kwd(KwdTypedef), Kwd(KwdPackage):
 					add(token, DIRECTIVE);
 				case Kwd(_), Const(CIdent("trace")):
 					add(token, KEYWORD); 
@@ -305,7 +312,7 @@ class HaxeMarkup
 					add(token);
 			}
 			
-			token = stream.peek();
+			token = peek(0);
 		}
 
 		var pad = 4;

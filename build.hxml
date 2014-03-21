@@ -9,6 +9,6 @@
 
 --next
 
--main edit.Server
+-main Server
 -neko pages/server.n
 -cp src

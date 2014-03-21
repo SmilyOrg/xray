@@ -2,6 +2,7 @@ package xray;
 
 import haxe.macro.Type;
 import js.html.InputElement;
+import xhx.HaxeMarkup;
 using xray.TypeTools;
 using xray.Data;
 using Lambda;
@@ -141,7 +142,7 @@ typedef TypeExports = Map<String, Array<{name:String, pos:Array<Int>}>>;
 			return;
 		}
 
-		output.innerHTML = xhx.HaxeMarkup.markup(files.get(url), url, export);
+		output.innerHTML = HaxeMarkup.markup(files.get(url), url, export);
 		if (line > -1) js.Browser.document.getElementById("L" + line).scrollIntoView();
 		else js.Browser.document.getElementById("L1").scrollIntoView();
 	}
@@ -155,6 +156,7 @@ typedef TypeExports = Map<String, Array<{name:String, pos:Array<Int>}>>;
 
 	function sourceLoaded(data:String, url:String)
 	{
+		data = data.replace("\r", "");
 		files.set(url, data);
 		showSource(url);
 	}

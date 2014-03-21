@@ -33,6 +33,7 @@ class Export
 
 		var data = haxe.Serializer.run(module);
 		sys.io.File.saveContent("pages/export.txt", data);
+		trace(module);
 		// trace(module.get("StdTypes"));
 	}
 
